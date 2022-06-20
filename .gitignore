@@ -1,0 +1,12 @@
+.official
+.svn
+.options
+.windows
+objects
+temp
+binaries.c
+.clean
+convert_binaries_to_c_source
+mme
+mme.exe
+build.c
