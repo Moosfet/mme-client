@@ -1,0 +1,7 @@
+To produce the Windows version:
+
+export CFLAGS="-m64 -fPIC"
+export LFLAGS=-fPIC
+export CC="x86_64-w64-mingw32-gcc"
+
+Then ./configure and make as usual.

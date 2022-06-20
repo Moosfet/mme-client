@@ -1,0 +1,13 @@
+Available command-line options:
+
+  --help
+      Displays this help text.
+
+  --server (server address)
+      Connects directly to the specified server, rather than displaying a list
+      of servers and allowing the user to choose which server to connect to.
+      Server address may be a domain name or an IP address, and may include a
+      port number after a colon.  Example:  --server server.example.com:43444
+
+  --packets
+      Displays a dump of all packets received from the map server.
