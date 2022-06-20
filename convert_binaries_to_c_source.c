@@ -1,4 +1,8 @@
-#include "everything.h"
+#define _GNU_SOURCE
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
 
 void main (int argc, char **argv) {
   if (argc < 2) {
@@ -10,7 +14,7 @@ void main (int argc, char **argv) {
     char *name;
     char *p = rindex(argv[i], '/');
     if (p) p++;
-    else p = name;
+    else p = argv[i];
     asprintf(&name, "%s", p);
 
     // create variable name by replacing bad chars with _
