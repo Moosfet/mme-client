@@ -73,34 +73,63 @@ void glfw_terminate() {
   glfwTerminate();
 };
 
-static GLFWmonitor *get_monitor_of_game_window() {
-  // get the location and size of the game window
+//--page-split-- get_monitor_of_game_window
+
+// To get dual use out of this function, if all of the parameters are positive,
+// pretend that's the window position and instead of returning a monitor,
+// just return 1 if it looks like an OK place to position the window.
+// We'll subtract lucky 7 pixels from the Y position and cut the width and
+// height in half since we're we're mostly just worried about whether the
+// title bar is accessible and the window is at least partially visible.
+
+static GLFWmonitor *get_monitor_of_game_window(int x, int y, int width, int height) {
+  // s = rightmost pixel, t = bottommost pixel
   int wx, wy, ws, wt;
-  glfwGetWindowPos(glfw_window, &wx, &wy);
-  glfwGetWindowSize(glfw_window, &ws, &wt);
+  if (x >= 0 && y >= 0) {
+    width /= 2; height /= 2;
+    x += width / 2; y -= 7;
+    wx = x; wy = y; ws = x + width - 1; wt = y + height - 1;
+  } else {
+    // get the location and size of the game window
+    glfwGetWindowPos(glfw_window, &wx, &wy);
+    glfwGetWindowSize(glfw_window, &ws, &wt);
+    ws += wx - 1; wt += wy - 1;
+  };
   int count;
   GLFWmonitor **monitor = glfwGetMonitors(&count);
   GLFWmonitor *best_monitor = glfwGetPrimaryMonitor();
-  printf("Game window covers x %d to %d and y %d to %d\n", wx, wx + ws, wy, wy + wt);
+  //printf("Game window covers x %d to %d and y %d to %d\n", wx, ws, wy, wt);
   int best_coverage = 0;
   for (int i = 0; i < count; i++) {
     // get the location and size of the monitor
     int mx, my;
     glfwGetMonitorPos(monitor[i], &mx, &my);
     const GLFWvidmode *mode = glfwGetVideoMode(monitor[i]);
-    int ms = mode->width;
-    int mt = mode->height;
-    printf("Monitor %d covers x %d to %d and y %d to %d\n", i, mx, mx + ms, my, my + mt);
+    int ms = mx + mode->width - 1;
+    int mt = my + mode->height - 1;
+    //printf("Monitor %d covers x %d to %d and y %d to %d\n", i, mx, ms, my, mt);
     // determine how much of the game window overlaps it
     if (mx < wx) mx = wx;
     if (my < wy) my = wy;
-    if (mx + ms > wx + ws) ms = mx + (ws - wx);
-    if (my + mt > wy + wt) mt = my + (wt - wy);
-    int coverage = (ms - mx) * (mt - my);
-    printf("Game window occupies %d pixels of monitor %d.\n", coverage, i);
-    if (coverage > best_coverage) best_monitor = monitor[i];
+    if (ms > ws) ms = ws;
+    if (mt > wt) mt = wt;
+    int coverage = (ms - mx + 1) * (mt - my + 1);
+    //printf("Game window occupies %d pixels (%d, %d) of monitor %d.\n", coverage, (ms - mx + 1), (mt - my + 1), i);
+    if (best_coverage < coverage) {
+      best_coverage = coverage;
+      best_monitor = monitor[i];
+    };
   };
-  return best_monitor;
+  if (x >= 0 && y >= 0) {
+    //printf("%d vs. %d (%d, %d)\n", best_coverage, (ws - wx + 1) * (wt - wy + 1), (ws - wx + 1), (wt - wy + 1));
+    if (best_coverage == (ws - wx + 1) * (wt - wy + 1)) {
+      return (void *) 1;
+    } else {
+      return NULL;
+    };
+  } else {
+    return best_monitor;
+  };
 };
 
 //--page-split-- glfw_open_window
@@ -120,6 +149,11 @@ void glfw_open_window() {
   if (option_window_height > mode->height) option_window_height = mode->height;
   if (option_window_width < 992) option_window_width = 992;
   if (option_window_height < 608) option_window_height = 608;
+  // Maybe we should allow at least this small?...
+  //if (option_window_width < 928) option_window_width = 928;
+  //if (option_window_height < 448) option_window_height = 448;
+  //if (option_window_width < 640) option_window_width = 640;
+  //if (option_window_height < 360) option_window_height = 360;
   if (!option_remember_size) {
     option_window_width = 992;
     option_window_height = 608;
@@ -128,8 +162,20 @@ void glfw_open_window() {
   if (!glfw_window) easy_fuck("Failed to create a window.\n");
   glfwMakeContextCurrent(glfw_window);
 
-  if (option_center_window) {
-    GLFWmonitor *monitor = get_monitor_of_game_window();
+  int center_instead = 0;
+  if (option_window_location == 2) {
+    printf("Should we restore window position (%d, %d)?\n", option_window_location_x, option_window_location_y);
+    if (get_monitor_of_game_window(option_window_location_x, option_window_location_y, option_window_width, option_window_height)) {
+      printf("Attempting to restore window position (%d, %d)\n", option_window_location_x, option_window_location_y);
+      glfwSetWindowPos(glfw_window, option_window_location_x, option_window_location_y);
+      glfwSetWindowSize(glfw_window, option_window_width, option_window_height);
+    } else {
+      printf("Saved window position is not entirely inside any monitor, so centering window instead.\n");
+      center_instead = 1;
+    };
+  };
+  if (option_window_location == 1 || center_instead) {
+    GLFWmonitor *monitor = get_monitor_of_game_window(-1, -1, -1, -1);
     const GLFWvidmode *mode = glfwGetVideoMode(monitor);
     glfwSetWindowPos(glfw_window, (mode->width - option_window_width) / 2, (mode->height - option_window_height) / 2);
   };
@@ -159,7 +205,9 @@ void glfw_open_window() {
 //--page-split-- glfw_close_window
 
 void glfw_close_window() {
+  glfwGetWindowPos(glfw_window, &option_window_location_x, &option_window_location_y);
   glfwGetWindowSize(glfw_window, &option_window_width, &option_window_height);
+  printf("Window size at close: %d x %d\n", option_window_width, option_window_height);
   glfwDestroyWindow(glfw_window);
   glfw_window = NULL;
 };

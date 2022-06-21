@@ -27,7 +27,7 @@ int option_chat_clear;
 int option_optimize_chunks;
 int option_window_width;
 int option_window_height;
-int option_center_window;
+int option_window_location;
 int option_remember_size;
 int option_fsaa_samples;
 int option_multiple_paste;
@@ -47,6 +47,8 @@ int option_superhuman;
 float option_volume;
 int option_key_input[CONTROLS_KEY_LIMIT][2];
 int option_anisotropic_filtering;
+int option_window_location_x;
+int option_window_location_y;
 
 // unsaved options:
 int option_f3_display = 0;
@@ -117,7 +119,7 @@ void option_load() {
   option_optimize_chunks = 1;
   option_window_width = 0;
   option_window_height = 0;
-  option_center_window = 1;
+  option_window_location = 1;
   option_remember_size = 0;
   option_fsaa_samples = 0;
   option_multiple_paste = 0;
@@ -136,6 +138,8 @@ void option_load() {
   option_superhuman = 1;
   option_volume = 1.0f;
   option_anisotropic_filtering = 0;
+  option_window_location_x = 0;
+  option_window_location_y = 0;
 
   option_key_reset();
 
@@ -176,7 +180,7 @@ void option_load() {
     READ_BYTE(option_optimize_chunks);
     READ_WORD(option_window_width);
     READ_WORD(option_window_height);
-    READ_BYTE(option_center_window);
+    READ_BYTE(option_window_location);
     READ_BYTE(option_remember_size);
     READ_BYTE(option_fsaa_samples);
     READ_BYTE(option_multiple_paste);
@@ -235,6 +239,8 @@ void option_load() {
     READ_BYTE(option_anisotropic_filtering);
     READ_UINT(option_key_input[CONTROLS_KEY_BLOCK_REPLACE][0]);
     READ_UINT(option_key_input[CONTROLS_KEY_BLOCK_REPLACE][1]);
+    READ_WORD(option_window_location_x);
+    READ_WORD(option_window_location_y);
 
     fclose(file);
 
@@ -291,7 +297,7 @@ void option_save() {
   WRITE_BYTE(option_optimize_chunks);
   WRITE_WORD(option_window_width);
   WRITE_WORD(option_window_height);
-  WRITE_BYTE(option_center_window);
+  WRITE_BYTE(option_window_location);
   WRITE_BYTE(option_remember_size);
   WRITE_BYTE(option_fsaa_samples);
   WRITE_BYTE(option_multiple_paste);
@@ -346,6 +352,8 @@ void option_save() {
   WRITE_BYTE(option_anisotropic_filtering);
   WRITE_UINT(option_key_input[CONTROLS_KEY_BLOCK_REPLACE][0]);
   WRITE_UINT(option_key_input[CONTROLS_KEY_BLOCK_REPLACE][1]);
+  WRITE_WORD(option_window_location_x);
+  WRITE_WORD(option_window_location_y);
 
   #ifdef UNIX
   close(open("options.bin", O_CREAT, 0600));

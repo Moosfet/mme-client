@@ -732,7 +732,7 @@ extern int option_chat_clear;
 extern int option_optimize_chunks;
 extern int option_window_width;
 extern int option_window_height;
-extern int option_center_window;
+extern int option_window_location;
 extern int option_remember_size;
 extern int option_fsaa_samples;
 extern int option_multiple_paste;
@@ -753,6 +753,8 @@ extern float option_volume;
 extern int option_key_input[CONTROLS_KEY_LIMIT][2];
 extern int option_anisotropic_filtering;
 extern int option_f3_display;
+extern int option_window_location_x;
+extern int option_window_location_y;
 
 void option_key_reset();
 void option_load();
