@@ -413,7 +413,6 @@ extern double event_mouse_position_y;
 
 // glfw.h
 
-extern int glfw_fullscreen_flag;
 extern int glfw_mouse_capture_flag;
 extern int glfw_mouse_x_center;
 extern int glfw_mouse_y_center;
@@ -425,6 +424,7 @@ void glfw_open_window();
 void glfw_close_window();
 void glfw_capture_mouse();
 void glfw_release_mouse();
+void glfw_fullscreen(int enable);
 void glfw_set_window_title(char *title);
 
 // group.h

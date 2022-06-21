@@ -9,8 +9,11 @@ void menus_fps() {
 
   gui_text(-1, 0, "FPS Settings");
 
-  if (gui_check(4, 11, &option_request_vertical_sync, 1, "Ask the graphics driver to enable vertical sync.")) main_restart();
+  if (gui_check(4, 11, &option_request_vertical_sync, 1, "Ask the graphics driver to enable vertical sync.")) {
+    glfwSwapInterval(!!option_request_vertical_sync);
+  };
 
+  #if 0
   if (option_request_vertical_sync) {
     if (statistics_vsync_rate == 0) {
       gui_text(1, 12, "Note: Your graphics driver has ignored this request.");
@@ -20,6 +23,10 @@ void menus_fps() {
       gui_text(1, 12, "Note: Your graphics driver forces vertical sync.");
     };
   };
+  #else
+  gui_text(1, 12, "Note: Your graphics driver may override this setting.");
+  #endif
+
 
   gui_check(4, 9, &option_fps_display, 1, "Display the current FPS in the corner of the screen.");
 

@@ -320,8 +320,9 @@ void event_keyboard_key_callback(GLFWwindow *window, int key, int scancode, int 
     #endif
 
     if (action == GLFW_PRESS && key == GLFW_KEY_F11) {
-      glfw_fullscreen_flag = !glfw_fullscreen_flag;
-      main_restart();
+      static int fullscreen = 0;
+      fullscreen = !fullscreen;
+      glfw_fullscreen(fullscreen);
     };
 
     if (action == GLFW_PRESS && key == GLFW_KEY_F12) {

@@ -1,6 +1,5 @@
 #include "everything.h"
 
-int glfw_fullscreen_flag = 0;
 int glfw_mouse_capture_flag = 0;
 int glfw_mouse_x_center;
 int glfw_mouse_y_center;
@@ -55,16 +54,9 @@ void glfw_initialize() {
  glfwSetErrorCallback((GLFWerrorfun) error_callback);
   int result = glfwInit();
   if (!result) easy_fuck("glfwInit() returned a non-zero value!");
-
   glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
   context_window = glfwCreateWindow(64, 64, "", NULL, NULL);
   glfwMakeContextCurrent(context_window);
-
-  // The first buffer swap seems to set some stuff detected by thread sanatizer,
-  //glfwSwapBuffers(share); // so we'll pointlessly swap the buffers here.
-  // ...except I think that was me using GLFW wrong so maybe we don't need it.
-
-  glfw_fullscreen_flag = 0; // was argument_fullscreen;
 };
 
 //--page-split-- glfw_terminate
@@ -188,23 +180,19 @@ void glfw_open_window() {
   glfwSetWindowCloseCallback(glfw_window, window_close_callback);
 
   glfw_mouse_capture_flag = 0;
-  if (glfw_fullscreen_flag && menu_function_pointer == menus_play) glfw_capture_mouse();
   int samples = glfwGetWindowAttrib(glfw_window, GLFW_SAMPLES);
   printf("Opened window with GLFW_SAMPLES == %d.\n", samples);
 
   // I should try this SRGB thing sometime.
   //glEnable(GL_FRAMEBUFFER_SRGB);
 
-  if (option_request_vertical_sync) {
-    glfwSwapInterval(1);  // Enables vertical sync, sometimes.
-  } else {
-    glfwSwapInterval(0);  // Disables vertical sync, sometimes.
-  };
+  glfwSwapInterval(!!option_request_vertical_sync);
 };
 
 //--page-split-- glfw_close_window
 
 void glfw_close_window() {
+  glfw_fullscreen(0);
   glfwGetWindowPos(glfw_window, &option_window_location_x, &option_window_location_y);
   glfwGetWindowSize(glfw_window, &option_window_width, &option_window_height);
   printf("Window size at close: %d x %d\n", option_window_width, option_window_height);
@@ -231,5 +219,25 @@ void glfw_set_window_title(char *title) {
     memory_allocate(&full, 0);
   } else {
     glfwSetWindowTitle(glfw_window, "Multiplayer Map Editor");
+  };
+};
+
+void glfw_fullscreen (int enable) {
+  static int saved_x = 0, saved_y = 0, saved_width = 0, saved_height = 0;
+  static int is_fullscreen_now = 0;
+  if (enable && !is_fullscreen_now) {
+    glfwGetWindowPos(glfw_window, &saved_x, &saved_y);
+    glfwGetWindowSize(glfw_window, &saved_width, &saved_height);
+    GLFWmonitor *monitor = get_monitor_of_game_window(-1, -1, -1, -1);
+    const GLFWvidmode *mode = glfwGetVideoMode(monitor);
+    glfwSetWindowMonitor(glfw_window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+    is_fullscreen_now = 1;
+  };
+  if (!enable && is_fullscreen_now) {
+    glfwSetWindowMonitor(glfw_window, NULL, saved_x, saved_y, saved_width, saved_height, GLFW_DONT_CARE);
+    // In Wine, restoring the window position and size doesn't work,
+    // but doing an extra window size call seems to fix the position too.
+    glfwSetWindowSize(glfw_window, saved_width, saved_height);
+    is_fullscreen_now = 0;
   };
 };
