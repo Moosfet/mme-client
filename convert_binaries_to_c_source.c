@@ -28,7 +28,10 @@ void main (int argc, char **argv) {
     printf("unsigned char data_%s[] = \"", name);
 
     FILE *file = fopen(argv[i], "rb");
-    if (!file) fprintf(stderr, "Failed to open %s: %s\n", argv[i], strerror(errno));
+    if (!file) {
+      fprintf(stderr, "Failed to open %s: %s\n", argv[i], strerror(errno));
+      exit(1);
+    };
     int size = 0;
     unsigned char buffer[4096];
     int avoid_digit = 0;
@@ -38,6 +41,7 @@ void main (int argc, char **argv) {
       count = fread(buffer, 1, 4096, file);
       if (count < 0) {
         fprintf(stderr, "Error reading %s: %s\n", argv[i], strerror(errno));
+        exit(1);
       } else if (count > 0) {
         size += count;
         for (int i = 0; i < count; i++) {

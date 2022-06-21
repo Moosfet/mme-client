@@ -804,88 +804,8 @@ int gui_input(int x, int y, int size, int length, char *string, int flags) {
             menu_next_focus = menu_focus_object + 1;
           };
         };
-        #ifdef TEST
-        if (KEY == GLFW_KEY_F4) {
-          if (current < length) {
-            memmove(string + cursor + 1, string + cursor, length - cursor);
-            string[cursor] = 0x1B;
-            cursor++;
-            change = 1;
-            current++;
-          };
-          if (current < length) {
-            memmove(string + cursor + 1, string + cursor, length - cursor);
-            string[cursor] = 0x0B;
-            cursor++;
-            change = 1;
-            current++;
-          };
-        };
-        if (KEY == GLFW_KEY_F5) {
-          if (current < length) {
-            memmove(string + cursor + 1, string + cursor, length - cursor);
-            string[cursor] = 0x1B;
-            cursor++;
-            change = 1;
-            current++;
-          };
-          if (current < length) {
-            memmove(string + cursor + 1, string + cursor, length - cursor);
-            string[cursor] = 0x0D;
-            cursor++;
-            change = 1;
-            current++;
-          };
-        };
-        if (KEY == GLFW_KEY_F6) {
-          if (current < length) {
-            memmove(string + cursor + 1, string + cursor, length - cursor);
-            string[cursor] = 0x1B;
-            cursor++;
-            change = 1;
-            current++;
-          };
-          if (current < length) {
-            memmove(string + cursor + 1, string + cursor, length - cursor);
-            string[cursor] = 0x0E;
-            cursor++;
-            change = 1;
-            current++;
-          };
-        };
-        if (KEY == GLFW_KEY_F7) {
-          if (current < length) {
-            memmove(string + cursor + 1, string + cursor, length - cursor);
-            string[cursor] = 0x1B;
-            cursor++;
-            change = 1;
-            current++;
-          };
-          if (current < length) {
-            memmove(string + cursor + 1, string + cursor, length - cursor);
-            string[cursor] = 0x0F;
-            cursor++;
-            change = 1;
-            current++;
-          };
-        };
-        if (KEY == GLFW_KEY_F8) {
-          if (current < length) {
-            memmove(string + cursor + 1, string + cursor, length - cursor);
-            string[cursor] = 0x1B;
-            cursor++;
-            change = 1;
-            current++;
-          };
-          if (current < length) {
-            memmove(string + cursor + 1, string + cursor, length - cursor);
-            string[cursor] = 0x10;
-            cursor++;
-            change = 1;
-            current++;
-          };
-        };
-        #endif
+      };
+      if (KEY_PRESS_EVENT || KEY_REPEAT_EVENT) {
         if (KEY == GLFW_KEY_LEFT) {
           if (cursor > 0) cursor--;
         };
@@ -906,20 +826,11 @@ int gui_input(int x, int y, int size, int length, char *string, int flags) {
           };
         };
         if (KEY == GLFW_KEY_BACKSPACE) {
-          // Apparently people hit shift-backspace unintentionally...
-          //if (menu_modifier_shift) {
-          //  if (string[0] != 0) {
-          //    cursor = 0;
-          //    string[0] = 0;
-          //    change = 1;
-          //  };
-          //} else {
-            if (cursor > 0) {
-              cursor--;
-              memmove(string + cursor, string + cursor + 1, length - cursor);
-              change = 1;
-            };
-          //};
+          if (cursor > 0) {
+            cursor--;
+            memmove(string + cursor, string + cursor + 1, length - cursor);
+            change = 1;
+          };
         };
         if (KEY == GLFW_KEY_HOME) {
           cursor = 0;

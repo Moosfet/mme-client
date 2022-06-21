@@ -385,6 +385,7 @@ extern double event_mouse_position_y;
 
 #define CHARACTER_EVENT (event_list[menu_current_event][0] == 0 && event_list[menu_current_event][1] == GLFW_PRESS)
 #define KEY_PRESS_EVENT (event_list[menu_current_event][0] == 1 && event_list[menu_current_event][1] == GLFW_PRESS)
+#define KEY_REPEAT_EVENT (event_list[menu_current_event][0] == 1 && event_list[menu_current_event][1] == GLFW_REPEAT)
 #define KEY_RELEASE_EVENT (event_list[menu_current_event][0] == 1 && event_list[menu_current_event][1] == GLFW_RELEASE)
 #define BUTTON_EVENT (event_list[menu_current_event][0] == 2)
 #define WHEEL_EVENT (event_list[menu_current_event][0] == 3)

@@ -73,6 +73,36 @@ void glfw_terminate() {
   glfwTerminate();
 };
 
+static GLFWmonitor *get_monitor_of_game_window() {
+  // get the location and size of the game window
+  int wx, wy, ws, wt;
+  glfwGetWindowPos(glfw_window, &wx, &wy);
+  glfwGetWindowSize(glfw_window, &ws, &wt);
+  int count;
+  GLFWmonitor **monitor = glfwGetMonitors(&count);
+  GLFWmonitor *best_monitor = glfwGetPrimaryMonitor();
+  printf("Game window covers x %d to %d and y %d to %d\n", wx, wx + ws, wy, wy + wt);
+  int best_coverage = 0;
+  for (int i = 0; i < count; i++) {
+    // get the location and size of the monitor
+    int mx, my;
+    glfwGetMonitorPos(monitor[i], &mx, &my);
+    const GLFWvidmode *mode = glfwGetVideoMode(monitor[i]);
+    int ms = mode->width;
+    int mt = mode->height;
+    printf("Monitor %d covers x %d to %d and y %d to %d\n", i, mx, mx + ms, my, my + mt);
+    // determine how much of the game window overlaps it
+    if (mx < wx) mx = wx;
+    if (my < wy) my = wy;
+    if (mx + ms > wx + ws) ms = mx + (ws - wx);
+    if (my + mt > wy + wt) mt = my + (wt - wy);
+    int coverage = (ms - mx) * (mt - my);
+    printf("Game window occupies %d pixels of monitor %d.\n", coverage, i);
+    if (coverage > best_coverage) best_monitor = monitor[i];
+  };
+  return best_monitor;
+};
+
 //--page-split-- glfw_open_window
 
 void glfw_open_window() {
@@ -99,13 +129,9 @@ void glfw_open_window() {
   glfwMakeContextCurrent(glfw_window);
 
   if (option_center_window) {
-    GLFWmonitor *monitor = glfwGetWindowMonitor(glfw_window);
-    if (monitor) {
-      const GLFWvidmode *mode = glfwGetVideoMode(monitor);
-      glfwSetWindowPos(glfw_window, (mode->width - option_window_width) / 2, (mode->height - option_window_height) / 2);
-    } else {
-      fprintf(stderr, "Why can't I get the monitor?\n");
-    };
+    GLFWmonitor *monitor = get_monitor_of_game_window();
+    const GLFWvidmode *mode = glfwGetVideoMode(monitor);
+    glfwSetWindowPos(glfw_window, (mode->width - option_window_width) / 2, (mode->height - option_window_height) / 2);
   };
 
   glfwSetKeyCallback(glfw_window, event_keyboard_key_callback);
@@ -118,7 +144,7 @@ void glfw_open_window() {
   glfw_mouse_capture_flag = 0;
   if (glfw_fullscreen_flag && menu_function_pointer == menus_play) glfw_capture_mouse();
   int samples = glfwGetWindowAttrib(glfw_window, GLFW_SAMPLES);
-  printf("Opened window with GLFW_FSAA_SAMPLES == %d.\n", samples);
+  printf("Opened window with GLFW_SAMPLES == %d.\n", samples);
 
   // I should try this SRGB thing sometime.
   //glEnable(GL_FRAMEBUFFER_SRGB);
