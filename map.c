@@ -1934,12 +1934,12 @@ void *map_chunk_thread(void *parameter) {
 void map_render() {
 
   if (option_fog_type == 1) {
-    glClearColor(0.6, 0.8, 1.0, 1.0);
+    glClearColor(0.6, option_anaglyph_enable ? 0 : 0.8, 1.0, 1.0);
   } else {
     if ((option_fog_type & 1) == 0) {
-      glClearColor(0.05, 0.05, 0.05, 1.0);
+      glClearColor(0.05, option_anaglyph_enable ? 0 : 0.05, 0.05, 1.0);
     } else {
-      glClearColor(0.75, 0.8, 0.85, 1.0);
+      glClearColor(0.75, option_anaglyph_enable ? 0 : 0.8, 0.85, 1.0);
     };
   };
 
@@ -1950,12 +1950,13 @@ void map_render() {
 
   int do_anaglyph = option_anaglyph_enable && option_pupil_distance > 0.0;
 
+  static int toggle = 0;
+  toggle = !toggle;
+
   for (int eye = (do_anaglyph ? 1 : 0); eye < (do_anaglyph ? 3 : 1); eye++) {
     if (eye == 0) glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 
-    // yellow blue, filters well, but the yellow is not very dark
-    if (eye == 1) glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE);
-    if (eye == 2) glColorMask(GL_FALSE, GL_FALSE, GL_TRUE, GL_TRUE);
+    //if (eye == 2) continue;
 
     // red purple, purple visible in both eyes
     if (eye == 1) glColorMask(GL_TRUE, GL_TRUE, GL_FALSE, GL_TRUE);
@@ -1965,11 +1966,18 @@ void map_render() {
     if (eye == 1) glColorMask(GL_TRUE, GL_TRUE, GL_FALSE, GL_TRUE);
     if (eye == 2) glColorMask(GL_FALSE, GL_FALSE, GL_TRUE, GL_TRUE);
 
-    //
-    if (eye == 1) glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE);
-    if (eye == 2) glColorMask(GL_FALSE, GL_TRUE, GL_TRUE, GL_TRUE);
+    //if (!toggle) {
+      // red cyan, i guess this is the best one
+      if (eye == 1) glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE);
+      if (eye == 2) glColorMask(GL_FALSE, GL_TRUE, GL_TRUE, GL_TRUE);
+    //} else {
+      // yellow blue, filters well, but the yellow is not very dark
+      if (eye == 1) glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE);
+      if (eye == 2) glColorMask(GL_FALSE, GL_FALSE, GL_TRUE, GL_TRUE);
+    //};
 
-    if (eye < 2) glClear(GL_COLOR_BUFFER_BIT);
+    //if (eye < 2)
+    glClear(GL_COLOR_BUFFER_BIT);
 
     glClear(GL_DEPTH_BUFFER_BIT);
     use_map_coordinates(eye);
