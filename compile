@@ -9,8 +9,8 @@ function error {
 echo -ne "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
 mkdir objects 2>/dev/null
 
-COMPILE_OPTIONS="-O9 -g --fast-math -funsigned-char -Wno-unused-result -Werror -fdiagnostics-color=always"
-LINK_OPTIONS=""
+COMPILE_OPTIONS="-O9 -g --fast-math -funsigned-char -Wno-unused-result -Werror -fdiagnostics-color=always -fPIE -pie"
+LINK_OPTIONS="-fPIE -pie"
 LINK_LIBRARIES="-lm -lpthread"
 
 # create build.h with version number
@@ -45,8 +45,8 @@ for i in $@; do
   i=${i^^}
   if [ $i == LINUX ]; then
     echo "char build_target[] = \"Linux\";" >> build.c
-    COMPILE_OPTIONS="-DUNIX $COMPILE_OPTIONS -fPIE -D_FORTIFY_SOURCE=2 -fstack-protector-all";
-    LINK_OPTIONS="-Wl,-z,relro,-z,now,-z,noexecstack -pie $LINK_OPTIONS"
+    COMPILE_OPTIONS="-DUNIX $COMPILE_OPTIONS -fstack-protector-all -D_FORTIFY_SOURCE=2";
+    LINK_OPTIONS="$LINK_OPTIONS -Wl,-z,relro,-z,now,-z,noexecstack"
     LINK_LIBRARIES="$LINK_LIBRARIES -lbacktrace -lz -l:libglfw.so.3 -lGL -lGLU -lasound"
     COMPILER="gcc"
     EXE="mme"
