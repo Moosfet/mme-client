@@ -1,0 +1,759 @@
+*** Multiplayer Map Editor -- Network Protocol ***
+
+To help server developers, the client displays a complete dump of all packets sent and received when it is run with the --packets command line argument.  The information is color coded.  This works great in Linux.  In Windows, you need to use a program called "ansicon" which you can get from http://adoxa.110mb.com/ansicon/index.html in order to get the colors, otherwise you just see the color codes which makes it even harder to read.
+
+data types:
+
+U1 - unsigned single-byte integer
+S1 - signed single-byte integer
+U2 - unsigned two-byte integer, little endian
+S2 - signed two-byte integer, little endian
+U4 - unsigned four-byte integer, little endian
+S4 - signed four-byte integer, little endian
+F4 - four-byte floating point number
+Bx - a null-filled binary string, of size 'x'
+B* - a null-filled binary string, size is remaining packet space
+
+For fixed size binary strings, no trailing null byte is present if the contents of the field fills it completely, otherwise the string ends at the first null byte, and any remaining data in the field is discarded.  Variable size strings usually appear at the end of a packet and consume the entire remaining space.  Occasionaly one occurs sooner and is terminated with a null character.  See the notes under each packet type.
+
+Where SHA-1 sums are used as data, they are treated as 20 byte binary strings, rather than numbers.  This means that they are not transformed for endianness, but instead represented in the big-endian format.  That is, if you believe they are numbers rather than binary data.  If you believe they are binary data, then just don't mess with them and everything should be fine.
+
+There is some SHA-1 code here:  http://www.ecstaticlyrics.com/code/download/sha1.c
+
+Compressed data is in zlib format, but the game client also accepts gzip data when zlib is able to recognize and decompress it, which appears to be always.  Substituting uncompressed data where compressed data is required is not allowed, since some uncompressed data may look like valid compressed data.
+
+Block type 0 and player id 0 are both invalid, as they are used in many packets to specify "no data / don't modify" and so they must not be used for actual players or map blocks.  In particular, when a 0 appears in any of the many block data packets, it means that the block in question should not be modified.
+
+Other block numbers have no default assignments, except that block type 1 is the default type that will be created by a player if they do not choose a block type from the block menu.  It is suggested that you use block type 255 for air, but since block properties (including whether or not a block is air) must be set up by the server, obviously any block number (except 0 which is invalid) may be used for air.
+
+Colors:
+
+1 - brown
+2 - red
+3 - orange
+4 - yellow
+5 - green
+6 - blue
+7 - purple
+8 - gray
+9 - white
+10 - black
+11 - rainbow
+12 - pink
+13 - silver
+14 - gold
+15 - ruby
+16 - emerald
+
+Packet format:
+
+U2 - packet type
+U2 - packet size
+** - packet data
+
+The packet size does not include the four bytes used for the packet type and packet size fields.  It's only the size of the packet data which is counted.
+
+
+Protocol negotiation:
+
+Before general communication begins, there is a process through which both server and client communicate which packet types they support, then select which packet types they would like to receive.
+
+    1.  Immediately upon connection to the remote host, send a PACKET_AVAILABLE_PACKET_TYPES which indicates which packet types you are able to send.
+
+    2.  Receive a PACKET_AVAILABLE_PACKET_TYPES from the remote system.
+
+    3.  Examine the available packet types and choose which you would like to receive and which you would not like to receive.  Criteria you may use are:
+
+        a.  Whether or not the remote system offers a particular packet type.  If the packet type is not indicated as being available, then the remote system does not know how to send it, and so choosing to receive it is pointless as it will never be sent.
+
+        b.  Whether or not you know how to read a particular packet type.  If you don't know how to read a packet type, receiving it is a waste of bandwidth.  Also, when data may be sent in several different packet types, the remote system will likely choose to send it in only one packet.  The packet selection process allows you to tell the remote system what packets you know how to read, so that it does not send data in packets that you do not know how to read.  Thus it is necessary to select only packet types that you know how to read.
+
+        c.  Whether or not a packet type is more appropriate than another packet type.  Some data may be available in several packet types, some of which contain additional data.  If you want that additional data, choose the packet type that has it.  If you do not need that additional data, choose the packet type that does not contain it.  ...but, obviously, you only have a choice if both packet types are available and you know how to read both packet types.  If only one type is available, or if you only know how to receive a particular type of data in one packet type, obviously you must choose that packet type.
+
+    3.  Send a PACKET_SELECT_PACKET_TYPES to the remote system.
+
+    4.  Receive a PACKET_SELECT_PACKET_TYPES from the remote system.
+
+    5.  Commence communication using the chosen Packet Types and Packet IDs.
+
+Note that this is rather simple using source code that will be made available.  It amounts to not much more than this:
+
+select(PACKET_THIS_TYPE) || select(PACKET_THAT_TYPE) || error("sorry, we need one or the other");
+
+send(PACKET_THIS_TYPE, field_a, field_b, field_c) || send(PACKET_THAT_TYPE, field_a, field_b);
+
+...and for going through so much trouble, we get a protocol which can be easily expanded in the future while retaining both forward and backward compatibility.
+
+
+Packet Type Constants:
+
+Packet Types are assigned a number, which once assigned and published, will not be recycled, even if the packet type is replaced with a better packet type.  The game client will likely continue to support retired packet types as long as it makes sense to do so, in order to remain compatible with server software that has not been upgraded to new packet types.  It is recommended, but not required, that servers do the same in order to remain compatible with older clients, or clients such as bots which may not have updates to support new packet types.
+
+The numbers in parenthesis are the valid packet sizes for each packet type.  Larger packet sizes are permitted, since they may be from future versions of the protocol, in which case the excess data should be ignored since such expansions will only be made when the most logical thing to do when a server / client doesn't support the larger packet is to do whatever it would do if it just ignored the extra data.  However, to prevent insanity of having to support every possible packet size, only specific sizes will be supported.  For example, if the numbers are (16, 24, 36) then your server / client should be prepared to accept packet sizes of 16, 24, 36, or more than 36 bytes.  Thus, if a packet arrives that is 18 bytes, you don't have to parse the additional bit of data, you can pretend it wasn't there and the packet was only 16 bytes.
+
+
+PACKET_AVAILABLE_PACKET_TYPES 0 (size depends on packet types available)
+
+The data in this packet is a bit vector, one bit for each of the 65536 possible packet types.  The format is little-endian, meaning that the least-significant bit of the least-significant byte is the bit for packet type zero.  The system sending this packet uses a one bit to indicate which packet types it knows how to send, and a zero bit for all other packet types.  Any zero bytes at the end of this packet need not be sent.  When receiving this packet, assume that any packet types whose bits were not included in the packet are not available.
+
+
+PACKET_SELECT_PACKET_TYPES 1 (size depends on packet types available)
+
+The format of the data in this packet is identical to the format of the data in PACKET_AVAILABLE_PACKET_TYPES.  The system sending this packet uses a one bit to indicate which packet types it wishes to receive.  The system receiving this packet must not send packets which are not indicated in this list.  This packet may be re-sent if a new packet selection is desired.
+
+Note that you must indicate your willingness to receive PACKET_SELECT_PACKET_TYPES, otherwise the client will respect your request not to receive this packet type, and protocol negotiation will stall.
+
+
+PACKET_PING_REQUEST 2 (any size)
+PACKET_PING_RESPONSE 3 (any size)
+
+When a PACKET_PING_REQUEST is received, the payload of the packet should not be examined, but instead simply returned in a PACKET_PING_RESPONSE packet.  Thus the contents of the packet may be used to measure latency or indicate synchronization points.  For testing connectivity, it is recommended that a PACKET_PING_REQUEST be sent only when no data has been received for 15 seconds, in order to minimize unnecessary bandwidth use.  For other uses, a PACKET_PING_REQUEST may be sent whenever necessary.  For simply preventing the connection from appearing to be dead, PACKET_IDLE_PING is a better choice.
+
+
+PACKET_IDLE_PING 4 (0)
+
+No data in this packet.  Just used to indicate the connection is still alive.  Send whenever you haven't sent any other data for ten seconds, otherwise it isn't necessary.
+
+
+PACKET_AUTHENTICATE 5 (0, 24, 52)
+
+This packet shall be sent by the client immediately after receiving PACKET_SELECT_PACKET_TYPES from the server, assuming the server selected to receive it.  If the client is unable to authenticate, it shall send an empty packet.  Also, the client may send a 24-byte packet in order to supply only a name.
+
+B24 the name this player is currently using
+U4 global player id number for this player
+U4 a unix time value, as returned by the time() function
+B20 authentication token
+
+All four pieces of data must come from the login server.  It will be permissible for the login server to reassign player names, and so the global user id number should be used to identify players.  The player name must be the correct uppercase/lowercase representation of the name.  The time value must be recent, and its purpose is to allow servers to prevent authentication tokens from being reused.  The server may deny any tokens over a certain age, and simply remember younger tokens and deny their reuse.  ...or a server may simply ignore the time value, just as it might ignore authentication altogether.
+
+The authentication token will be the SHA-1 sum of this structure:
+
+B20 secret server salt
+B24 player name
+U4 global user id number
+U4 a unix time value
+
+The last three fields are copied directly out of the packet.  Thus it is important that the unused portion of the player name actually contain null bytes, rather than simply a single terminating null byte.
+
+There is no response to this packet, but rather, the server decides what the correct response is, whether that be loading a map, presenting a new server menu, disconnecting the player with an error message, etc.  In particular, if authentication fails, the server is free to accept the connection anyway, if perhaps the server would like to use a server menu to prompt for a server password instead.
+
+
+PACKET_CONNECT 6 (53 minimum)
+
+This packet tells the client to disconnect from the current server and reconnect to a different server.  The server should not disconnect after sending this packet, but instead wait for the client to disconnect.
+
+B24 the name this player is currently using
+U4 global player id number for this player
+U4 a unix time value, as returned by the time() function
+B20 authentication token
+B* the address:port of the server to connect to
+
+The first four items are what will be placed into the PACKET_AUTHENTICATE sent to the next server.  Thus, the player's name must be null-filled and not simply null-terminated.
+
+The address:port may be a domain name & port, IPv4 address & port, or IPv6 address & port.  The port number must always be specified.  Examples: "server.example.com:9999" or "12.34.56.78:9999" or "[1234::CDEF]:9999"
+
+
+PACKET_DISCONNECT 7 (any size)
+
+U1 reason code
+U1 reconnect delay
+B* human-readable reason
+
+All fields are optional.  Reason codes, and reconnect delay, are to allow programs to choose an appropriate response when disconnected by a server.  If reconnect delay is non-zero, client should wait that many seconds before attempting reconnection.  If reconnect delay is zero or missing, client should assume that an immediate reconnection isn't advisable.
+
+0 = DISCONNECT_NULL - no useful disconnect code given, see human-readable reason.
+1 = DISCONNECT_ERROR - communication errors, like sending invalid data and such
+2 = DISCONNECT_REBOOT - Server is restarting, reconnect should be possible in less than 30 seconds.
+3 = DISCONNECT_FULL - server has too many clients, client may reconnect some time later, but not immediately
+4 = DISCONNECT_IDLE - disconnection for inactivity
+5 = DISCONNECT_KICK - client was kicked from the server, and may reconnect after some penalty period
+6 = DISCONNECT_BAN - client is banned from server, and will not be allowed to reconnect
+7 = DISCONNECT_RANDOM - used by the client when the player initiates a disconnect for whatever reason
+
+When either server or client wishes to disconnect, it should send a disconnect packet, then wait for the other to close the socket, as acknowledgement of receipt of the packet.  Obviously both server and client must be prepared for unannounced disconnects and ignored disconnect packets, but failure to receive such a packet before disconnect may be assumed to be indicative of some sort of problem.  For example, if disconnect occurs without a disconnect packet, a server may announce "Player Whomever is having network problems!" rather than the usual "Player Whomever has left the server!" in order to let players know that anything they've recently said to Whomever may not have been received.
+
+
+PACKET_CHAT_MESSAGE 8 (1 minimum)
+
+U1 player id
+B* the chat message
+
+A player ID of 0 indicates a server-initiated chat message, other numbers indicate user-initiated chat messages.  Colors are set using the escape character (27) followed by one of the color numbers (1 through 13).  All non-null non-27 characters are valid displayable characters.
+
+
+PACKET_ANNOUNCE_PLAYER 9 (1 minimum)
+
+U1 player id
+U1 color
+S24 player name
+
+Player position will be sent in a position packet later (or earlier if you like).  This just sets the player's name.  The server must not announce a player to his own client.  Player ID 0 is invalid.  The color code is unused, and may be zero to indicate a default color.
+
+If this packet is not long enough for the color or name fields, then those fields retain their previous values, and thus the packet simply reverses what PACKET_DENOUNCE_PLAYER does.
+
+
+PACKET_DENOUNCE_PLAYER 10 (1)
+
+U1 player id
+
+Removes the player from the map.  It is not necessary to use this if you are simply going to re-announce the player, such as when changing the player's name or color.  It only tells the client to stop rendering the player model.  The name and color are retained in case PACKET_ANNOUNCE_PLAYER is later sent with only the player number (a packet data size of 1 byte).
+
+
+PACKET_PLAYER_ABILITIES 11 (10, 26)
+
+Describes what the client should allow the player to do.
+
+U4 bit mask of various binary permissions
+        0: allow flying (floating)
+        1: allow high-speed flying
+        2: allow noclip
+        3-31 - reserved (set to zero)
+U4 box volume limit
+U2 box dimension limit
+
+Following fields not yet implemented:
+U2 box dimension limit 2
+U2 box dimension limit 3
+U4 copy/paste volume limit
+U2 copy/paste dimension limit 1
+U2 copy/paste dimension limit 2
+U2 copy/paste dimension limit 3
+U2 maximum length of chat messages
+
+a box volume of 1 disallows boxes
+a box volume of 0 disallows building altogether
+
+When using multiple dimension limits, the first limit applies to the largest dimension, the second to the second largest, the third to the smallest.  
+
+Chat message limit length counts only what they player types, and does not include their name or anything else.
+
+
+PACKET_MAP_LOADING 12 (any size)
+
+U1 loading progress
+B* loading message
+
+A map loading screen will be displayed with a progress bar.  This packet does not actually do anything to the map, just activates the map loading screen.  A value of '0' causes it to display no progress, and '255' causes it to display maximum progress.  If a message is specified in this packet, it replaces the currently displayed message, which defaults to "Receiving map data..." if no message has yet been sent.  To remove the map loading screen, send this packet with a length of 0.  Otherwise a progress value of '255' is assumed to mean "so close that it rounds to 100%" rather than that the loading is complete.
+
+It is possible to not use the map loading screen, and to instead send the map over time in chunks to the player, sending those chunks which are closest to the player at regular intervals, so that they player does not have to wait for the map to load, yet the map can be sent slowly to avoid large bandwidth usage when players first connect.  Whether or not this is an awesome idea or an annoying idea is up for debate, thus the map loading screen is an option, particularly since some server operators may wish for areas hidden underground to not be exposed by being seen as a result of the ground above them not being loaded yet.
+
+
+PACKET_RANDOM_GARBAGE 13 (any size)
+
+This packet is entirely optional, nearly undefined, and subsequently, almost useless.  It is intended for clients and servers which know each other to communicate information which otherwise has nothing to do with this protocol.
+
+It should probably start with a uniquie identifier of some sort, randomly chosen by whomever decided on the format of the rest of the packet, in order to avoid accidental misinterpretation of the packet's contents.  Using at least a 32-bit identifier is recommended.  Using a 16-byte identifier will ensure that accidental collisions are so unlikely that you may consider them to be impossible.
+
+It is expected that most software will not support this packet.  It's purpose is, for example, if someone writes their own server software and their own bot, and they want both pieces of software to have some officially-supported way to communicate extra data between each other.
+
+
+PACKET_MAP_SETUP 14 (0, 8)
+
+This packet shall cause the client to free any resources used by any current map, then create a new empty map with the following properties.
+
+U2 map x dimension
+U2 map y dimension
+U2 map z dimension
+U2 map sea level
+
+Map dimensions are required to be multiples of 32.
+
+No map data is included in this packet, nor does this packet activate the "map loading" screen.  If a "loading map" screen is desired, it should be activated before this packet is sent, to prevent the player from seeing the empty map.  After this packet is sent, load the map data with one of PACKET_MAP_FULL_*, PACKET_MAP_BUFFER_*, or PACKET_MAP_DATA.  Sending this packet with no data (zero size packet) frees resources used by the current map, but does not create a new one.
+
+
+PACKET_MAP_PROPERTIES 15 (8)
+
+This packet sets various properties of the map, without resetting the map data.  Changing these properties will, however, require all map chunks to be recompiled, so you should not sent this packet often.  Like, send it once, after sending PACKET_MAP_SETUP, and perhaps again if you want to change the map scale or something.  
+
+U4 bit mask of binary attributes
+  bit 0 - removed feature - always set to zero
+  bit 1 - removed feature - always set to zero
+  bit 2 - removed feature - always set to zero
+  bits 3-31 - reserved (set to zero)
+F4 size of a block, in meters
+
+
+PACKET_MAP_FILL 16 (13, 14)
+
+S2 lower_x
+S2 lower_y
+S2 lower_z
+S2 upper_x
+S2 upper_y
+S2 upper_z
+U1 new block type
+U1 player id
+
+Fills a map region with a single block type.  The player id field is optional, and if present, indicates the player responsible for the fill.  The lower coordinates must be less than the upper coordinates.
+
+
+PACKET_MAP_DATA 17 (12 minimum)
+
+Contains compressed data for a map region, specified by two corners.
+
+S2 lower_x
+S2 lower_y
+S2 lower_z
+S2 upper_x
+S2 upper_y
+S2 upper_z
+B* remaining packet space is zlib compressed data, XYZ data order.
+
+Uses compressed data to fill a map region.  Any 0 bytes in this data indicate that the associated block should not be changed.  The lower coordinates must be less than the upper coordinates.
+
+Example:
+
+if (upper_x < lower_x || upper_y < lower_y || upper_z < lower_z) error();
+// Also check that none of the coordinates are outside map boundaries.
+
+decompressed_size = (upper_x - lower_x + 1) * (upper_y - lower_y + 1) * (upper_z - lower_z + 1);
+
+for (int z = lower_z; z <= upper_z; z++) {
+  for (int y = lower_y; y <= upper_y; y++) {
+    for (int x = lower_x; x <= upper_x; x++) {
+      index = ((z - lower_z) * (upper_y - lower_y + 1) + (y - lower_y)) * (upper_x - lower_x + 1) + (x - lower_x);
+      if (decompressed_data[index] != 0) {
+        map_data[x][y][z] = decompressed_data[index];
+      };
+    };
+  };
+};
+
+Note that the total size of the compressed data is limited to 65524 bytes.  If using this packet for large areas of the map, it is recommended that the map be sent in 32x32x32 chunks, which have an uncompressed size of 32768, and so are sure to compress to a size that fits in the packet.
+
+
+PACKET_MAP_TOTAL_RESET 18 (0)
+PACKET_MAP_TOTAL_DATA 19 (any size)
+
+These work like the BUFFER counterparts, except that they always fill the entire map, and do so as the data is sent.  Thus there is no final packet as it would serve no purpose.  The map is filled once all of the data has been sent.  The advantage of this method of loading a map is that it is the fastest way to load the entire map.  The disadvantage is that, since the data is being written into the map as it is being received, the player cannot remain in the current map while the new map is being set, as can be done with the BUFFER packet which doesn't write any data into the map until the final packet is received, and thus the player has to stare at a map loading screen.
+
+
+PACKET_BUFFER_RESET 20 (0)
+PACKET_BUFFER_APPEND 21 (any size)
+
+These two packets allow for data larger than a single packet to be buffered by the client, then used by some other packet.  PACKET_BUFFER_RESET contains no data, and only resets the buffer to zero length.  PACKET_BUFFER_APPEND appends whatever data is in the packet to the buffer.  The contents of the buffer are then used by some other packet.  It is permissible to send other packets between PACKET_MAP_BUFFER_APPEND packets, in particular PACKET_MAP_LOADING to display a progress indicator to the user.
+
+
+PACKET_BUFFER_IS_MAP_DATA 22 (12)
+
+Works the same as PACKET_MAP_DATA except that the data comes from the buffer used by PACKET_BUFFER_RESET and PACKET_BUFFER_APPEND, so that large areas of the map, or the entire map, may be loaded at once.  PACKET_BUFFER_IS_MAP_DATA causes the buffer to be decompressed and filled into the coordinates specified in the packet, as follows:
+
+S2 lower_x
+S2 lower_y
+S2 lower_z
+S2 upper_x
+S2 upper_y
+S2 upper_z
+
+Note that this packet does not load a new map.  If you want to load a new map, you must first use PACKET_MAP_SETUP to set the dimensions and PACKET_MAP_FEATURES to set the properties of the map.  ...and you might do it like this:
+
+1.  Send PACKET_BUFFER_RESET
+2.  Send PACKET_MAP_LOADING interleaved with PACKET_BUFFER_APPEND until map data is transferred.
+3.  Send PACKET_MAP_SETUP to set map dimensions and PACKET_MAP_FEATURES to set other properties.
+4.  Send PACKET_BUFFER_IS_MAP_DATA to load the new map with the data from the buffer.
+5.  Send a final PACKET_MAP_LOADING packet to remove the map loading screen.
+
+Alternately, if a map is already visible to the player, there is no reason you cannot continue to allow them to play on that map until the new map has finished loading.  Perhaps even display a chat message to the effect of "Map has been loaded.  Type /switch to switch to the new map."
+
+The compressed data stream is permitted to be multiple smaller data streams compressed seperately and then appended end-to-end.
+
+
+PACKET_BUFFER_IS_FILE_DATA 23 (0)
+
+This causes the data in the PACKET_BUFFER_RESET / PACKET_BUFFER_APPEND buffer to be treated as a cacheable file, currently only used for texture image data.  There is no data in this packet.  The client computes the SHA-1 hash of the contents of the buffer, then saves it in a file of the same name.  The client also examines current texture mappings to determine if this is a texture used by an existing texture setup, and if so, loads it appropriately.
+
+Image data must be in a format understood by http://nothings.org/stb_image.c  This includes non-unusual JPEG images, and non-indexed PNG images.  Note that various OpenGL implementations do not deal well with textures with dimensions that are not powers of two, nor with textures with dimensions greater than 512.  For best results, always use images with power-of-two dimensions.
+
+
+PACKET_MOVE_PLAYER 24 (20, 21)
+
+F4 player x position, in block coordinates
+F4 player y position, in block coordinates
+F4 player z position, in block coordinates
+F4 player u angle (head left-right rotation), in radians
+F4 player v angle (head up-down rotation), in radians
+U1 player id
+
+The server must not send position updates for a player to his own client.  Player id 0, or no player ID at all, indicates that the client should teleport the player to this position.  Servers should limit the number of these packets they send.  If a server simply sends a packet to each connected player about each other connected player, then the amount of data sent grows exponentially with the number of players.  Note that, because of the exponential growth, this isn't a problem that is solved with a smaller packet format.  Servers must limit the number of these packets they send in other ways, such as taking into consideration player proximity, direction of view, and perhaps an upper limit on the number of different players whose positions will be sent to any one player, and whether or not the player has actually moved.
+
+
+PACKET_MAP_MODIFY 25 (7, 8)
+
+S2 block x coordinate
+S2 block y coordinate
+S2 block z coordinate
+U1 new block type
+U1 user id of the user who changed this block
+
+The user id field is the same number used in PACKET_ANNOUNCE_PLAYER.  If no user changed the block (such as water flows or other animations) then the user id field should be set to zero.
+
+
+PACKET_FILE_REQUEST 26 (20)
+
+B20 SHA-1 of file
+
+The client sends this packet when it does not have a texture specified in a PACKET_TEXTURE_DATA packet, in order to request that the server send the image file.
+
+
+PACKET_TEXTURE_SETUP 27 (2, 22, 38)
+
+S2 texture id number (1 through 4095, other values invalid)
+B20 SHA-1 of image file
+F4 width of the texture in meters, or negative value means that many repetitions per block
+F4 height of the texture in meters, or negative value means that many repetitions per block
+F4 texture alpha value, as explained below
+U32 flag bits:
+  0 - min filter: 0=linear, 1=mipmap
+  1 - mag filter: 0=linear, 1=nearest
+
+The client looks for the texture in the local cache, and if found, loads it into memory at the specified resolution.  If the image file is not found, a PACKET_FILE_REQUEST packet will be sent.  Everything else this packet does occurs regardless of whether the image file is available or not.  If the server eventually sends the image file, it will be assigned to the texture immediately, without requiring another PACKET_TEXTURE_SETUP to load it.
+
+The "alpha value" has different meanings depending on its value:
+
+  exactly 0.0: no alpha, texture is entirely non-transparent
+  between 0.0 and 1.0: use "alpha test" to render the texture, with this value as the alpha test value
+  exactly 1.0: use "alpha blend" to render the texture
+
+Alpha-test has substaintial advantages over alpha blending with regards to rendering, in that z-ordering of textures is unnecessary, and so it is preferred.  The only z-ordering the client performs is to render alpha-blended textures after all other textures, which means that if two alpha-blended textures overlap, you'll see different effects depending on which is rendered before which.  However, for simple uses, such as water, there is unlikely to be enough overlapping that anyone will notice.
+
+Sending a 22 byte packet simply changes the texture, but doesn't change anything else, and doesn't require map chunks to be recompiled.  Sending a 50 byte packet allows changing other properties, and forces the map chunks to be recompiled.  Sending a 2 byte packet simply deletes the texture setup, and also forces chunks to be recompiled.
+
+
+PACKET_GROUP_SETUP 28 (1 minimum)
+
+U1 group id number
+U1* list of blocks in group (null-terminated)
+B* group name
+
+Creates a block group and places blocks in that group.  If the packet length is one (so that it only includes the group number) then it deletes the block group.  Blocks may appear in more than one block group, or in no groups at all.  Blocks must appear in a block group to appear in the block menu, but nothing prevents a player from middle-clicking a block to copy it from the map.
+
+
+PACKET_BLOCK_SETUP 29 (17 minimum)
+
+U1 block id number (1 through 255, 0 is invalid)
+U2 texture id for "top" side of block
+U2 texture id for "bottom" side of block
+U2 texture id for "front" side of block
+U2 texture id for "back" side of block
+U2 texture id for "left" side of block
+U2 texture id for "right" side of block
+U32 flag bits (explained below)
+B* human-readable description of block
+
+Flag bits:
+  0: visible - set to 0 for air, 1 for basically everything else
+  1: impassible - set to 0 for air or water, 1 for solid blocks
+  2: draw reverse - explained in more detail below
+  3-4:
+    00 - does not emit light
+    01 - emits weak light
+    10 - emits strong light
+    11 - sunlight source
+  5: draw between - explained in more detail below
+
+The "draw reverse" option applies to transparent blocks.  Normally, when looking through transparent blocks, you'll see only the block faces which are air -> block transistions, and not the ones that are block -> air transistions.  Setting this bit causes the block -> air transistions to be visible as well.  This is what you will want in most cases, but in some cases it is undesirable, and so this bit controls the behavior.  Note that, even with this option enabled, if a transparent block is placed against a non-transparent block of a different type, the non-transparent block's texture will be rendered instead of this block's reverse texture.  
+
+The "draw between" option also applies to transparent blocks.  Normally, when two transparent blocks of the same block number are adjecent to each other, no texture is drawn between them.  This makes sense for almost every use case and so this option shouldn't be enabled except when necessary as it creates a block which is easily abused to slow rendering the map merely by creating large cuboids of the block.  One example of a necessary use case is a transparent "tall grass" texture which is to be placed over top of ordinary flat grass, which has a grass texture on its four sides, but is invisible on its top and bottom sides.  In this case it is necessary to see all of the faces between adjecent grass blocks, otherwise with a 10x10 area of this block on the ground, all you see is the 10x10 peremeter of the area, and inside that area you do not see the block at all.
+
+
+Server-Side Menus
+
+Most menu packets have a few fields in common:
+
+index - The slot where a GUI widget is stored in memory.  Using the same index replaces the widget, rather than creating a new one.  Using index 0 causes an index number to be automatically selected, which may interfere with any manually-selected index numbers, and so menus using the 0 index for any widget should use it for all widgets.
+
+name - A number used to identify a widget group.  Radio buttons in a group are mutually exclusive, selecting one will deselect others with a different value.  Other widgets do not affect each other by being in the same group, for example, if several check boxes are in the same group, each may be individually activated or deactivated, regardless of whether they have the same or different values, and each activated check box will be reported individually in a PACKET_MENU_RESPONSE with its name and individual value.  For other widget types, the name field simply identifies the widget in menu responses.
+
+value - A number used to identify a widget in a group.  For radio buttons, having the same name but different values makes the buttons part of a mutually-exclusive group.  When the menu response is generated, only the name/value of the selected buttons will be reported.  The same is true for check boxes, even if several check boxes have the same name and different values, each name/value of each selected check box will be reported.  For other widget types, the value is reported in the menu response along with the name, but otherwise has no effect or purpose.
+
+flags - All items use the same flag bits:
+  bit 0 - active - Makes check boxes and radio buttons activated by default.  Makes text input fields submit the menu data when enter is pressed.  Makes buttons red instead of the usual blue, which is intended for the case that the top of the menu has a series of buttons to select different views (like the group names at the top of the block menu).
+  bit 1 - live - Changes in widget state are sent immediately to the server.  Password fields do not support this flag.
+  bit 2 - disable - Makes a button which cannot be clicked.  May do the same for other widgets in the future.
+  bit 3 - offset - Normally buttons are drawn so that the text on them is in-line with other text on that line.  With this bit set, they are instead drawn half a line lower.  This is useful because it allows them to fit in the space of two lines of text, whereas the way they are normally drawn occupies three text lines because it consumes half of the line above and below the button's text.
+
+A note about the "disable" bit:  You shouldn't use this to torture users by displaying options they can't have.  The expected use case is for when there is something the user can do on the current menu, but only if some preconditions are met.  For example, you might have a "kick player" button that is grayed out until the user clicks one of the check boxes to indicate why the player is being kicked.  (obviously the check boxes then require the "active" bit to be set, so that the server knows when one or more is selected so that it can remove the disabled status of the button)  Such behavior allows the server to not deal with the case of the user clicking the button without choosing a reason, which is more complex since it requires an error screen to be displayed, which then frustrates the user.  It's far simpler to make the error impossible to commit in the first place.
+
+Column and line numbers start at zero.
+
+
+PACKET_MENU_REQUEST 30 (2)
+
+U1 available columns with current window size
+U1 available lines with current window size
+
+The client sends this packet whenever the user presses the "server menu" key.  The server, assuming it supports server menus, should then display the main server menu.  The columns and lines are the maximum that will fit in the window, however, generating a menu of this size generally doesn't look nice.  For best results, do one of two things:
+
+1.  Generate a menu of (width - 2) x (height - 1), which places the menu border within the game window.  This is what the chat window does.
+
+2.  Generate a menu of (width + 2) x (height + 2), which places the menu border outside the game window, then use only columns 1 through width and lines 1 through height, avoiding the lines and columns at the edge of the menu since those characters are not fully within the window.
+
+Alternately, if you do not want to create dynamic size menus, assume width and height to be 82 and 25, then follow one of the above two suggestions.  (Or just create an 80x24 menu.)  This is the default size of the game window and it is unlikely anyone will make the window smaller.  Also, the size is small enough for a 1024x768 resolution, and so the majority of players can make the window large enough to access the menu if they need to.
+
+
+PACKET_MENU_RESPONSE 31 (1, 4+)
+
+U1 menu number
+U1 name
+U1 value
+U1 flags
+B* text (if relevant)
+
+This response packet is used for all widget types on the menu that send responses.
+
+When a button is clicked, the state of all radio buttons, check boxes and text input fields are sent with this packet, then the packet for the button is sent last.  The same occurs for text input fields which have the active bit set.  However, when a link is clicked, only a packet for the link is sent.
+
+If a radio button, check box, or text input field has the "live update" flag set, changes in its state are sent immediately, with the live update bit set in this packet.  When a button is clicked, these packets are then sent again in response to the button, but without the "live update" bit set.  Thus packets with the live update bit set may be used simply to update a "name is available/unavailable" indication on the screen, then discarded, as the data will be sent again when a button is clicked.  Only packets without the "live update" bit set must be stored to be processed as parameters with whichever button was clicked.
+
+This packet is sent with just the menu number if the user exits the server menu without clicking any buttons or links.
+
+
+PACKET_MENU_RESET 32 (0, 3)
+
+U1 menu number
+U1 width of menu
+U1 height of menu
+U1 flags
+  bit 0 -- draw close button in corner
+  bit 1 -- draw blue area for title bar
+
+This clears any existing menu, then creates a new menu of the specified size.  The maximum size uses the values from PACKET_MENU_RESIZE.  For simplicity, you may simply use the values 80 and 24 which create a menu that fits within the default window size.
+
+The menu number is simply for your reference.  When the client sends events from the menu, it will include the menu number.  This is useful because, even after you send a new menu, network buffering may mean that an event from the old menu is still on it's way.  The menu number allows you to tell which menu an event came from.
+
+Sending this packet with no data disables the server menu and removes it from the screen.
+
+
+PACKET_MENU_TEXT 33 (3+)
+
+U1 index
+U1 column
+U1 line
+B* text
+
+Draws unclickable text at the specified position.  This packet may use color codes, like with PACKET_CHAT_MESSAGE.
+
+
+PACKET_MENU_LINK 34 (6+)
+
+U1 index
+U1 column
+U1 line
+U1 name
+U1 value
+U1 flags
+B* text
+
+Creates clickable text.  When the link is clicked, a PACKET_MENU_RESPONSE with identical "name" and "value" parameters is generated.
+
+
+PACKET_MENU_CHECK 35 (6+)
+
+Creates a check box, which can be toggled between on and off.
+
+U1 index
+U1 column
+U1 line
+U1 name
+U1 value
+U1 flags
+B* text
+
+The text is drawn at the specified column/line.  The actual checkbox is drawn in the two character positions to the left.  The active state of the checkbox is determined by flag bit 2.  In PACKET_MENU_RESPONSE, the same is true.  The "value" in PACKET_MENU_RESPONSE is always the value specified in PACKET_MENU_CHECK, only bit 2 of the flags indicates whether the checkbox is checked or not.
+
+
+PACKET_MENU_RADIO 36 (6+)
+
+Creates a "radio button", which is one of those things where there are several options and you can choose only one.
+
+U1 index
+U1 column
+U1 line
+U1 name
+U1 value
+U1 flags
+B* text
+
+The text is drawn at the specified column/line.  The actual button is drawn in the two character positions to the left.  To place several buttons in a group, use the same "name" value.  Then when one is selected, others with the same "name" but different "values" will be deselected.  When "live update" flag is set, it only sends an update when the button is activated.  If you want to know when a radio button is deactivated, you must set the flag on all buttons in the group, so that when a button is deactivated, you receive the live update for the button that was activated.
+
+
+PACKET_MENU_INPUT 37 (8+)
+
+U1 index
+U1 column
+U1 line
+U1 name
+U1 value
+U1 width (size of input box)
+U1 length (maximum length of user input)
+U1 flags
+B* text
+
+Creates a text input box.  Drawn so that the specified column/line is the first character of text in the box.  When the "active" flag is set in PACKET_MENU_INPUT, it causes the text input field to act like a button when enter is pressed within it.
+
+
+PACKET_MENU_BUTTON 38 (7+)
+
+U1 index
+U1 column
+U1 line
+U1 name
+U1 value
+U1 width (size of the button, use 0 to make button the size of the text)
+U1 flags
+B* text
+
+
+PACKET_MENU_ERASE 39 (1)
+
+U1 index
+
+Removes the menu item at the specified index.
+
+
+PACKET_MENU_SALTED_PASSWORD 40 (7, 27, 47)
+
+U1 index
+U1 column
+U1 line
+U1 name
+U1 value
+U1 width (size of input box)
+U1 flags
+B20 some salt
+B20 more salt
+
+Similar to PACKET_MENU_INPUT, but for passwords.  As the password is input into the field, only *'s are displayed.
+
+When prompting a user for a new password, a server sends the 7 byte version of this packet, specifying no salts.  The client then encrypts the password using a random salt, which it sends in its response along with the encrypted password.  The server then saves both the salt and the encrypted password.  (the server never gets the unencrypted password)
+
+When prompting a user to verify an existing password, the server sends the 47 byte version of this packet.  The first salt field contains the salt stored in the server's password database, which the client used when encrypting the password above.  The second salt is a new salt randomly chosen by the server, and is different for each request.  The client first encrypts the password with the first salt, then encrypts it using the second salt, then encrypts it using a third randomly chosen salt, which it sends in its response to the server.  The server can verify the password by taking the encrypted password stored in its database (which was already encrypted with the first salt), encrypting it with the salt it randomly chose and sent to the client, then encrypting the result with the new random salt received from the client, then comparing that result to the encrypted password sent by the client.  If it matches, then the user entered the same password.
+
+The 27 byte version of the packet should only be used when the server has a plain-text (unencrypted) password it needs to verify (which it obviously obtained outside the game, as the game doesn't make this possible).  In this case, the server should send only one salt value which it chooses at random.  The client will first encrypt the password with that salt, then encrypt the result with another salt that it chooses at random, and return both the encrypted password and the randomly chosen salt.
+
+Note that, while the server can get away without suppling a new random salt for each password request, doing so makes it so that if anyone ever successfully performs a man-in-the-middle attack on the server, the password response can be used repeatedly.  If the server demands that the password be encrypted differently each time it is requested, then a man-in-the-middle attack is necessary every time.  The purpose of the client's salt is simply to prevent a server from using a dictionary-based attack, based upon dictionaries built around a certain salt value which the server always uses for every password request.
+
+The PACKET_MENU_RESPONSE sent for these fields always contains 40 bytes of data, which is defined as follows:
+
+  B20 the random salt the client chose when encrypting the data
+  B20 the SHA-1 digest of the salt and password combination
+
+Data is always encrypted as follows:
+
+  B20 the salt used for the encryption
+  B* the data to be encrypted
+
+For the first encryption, the data is the password that is being encrypted, however long it may be, with no null terminator.  For subsequent encryptions, the data is the 20 byte SHA-1 digest that resulted from the previous encryption.
+
+
+PACKET_MENU_RESIZE 41 (3)
+
+U1 available columns with current window size
+U1 available lines with current window size
+U1 menu number
+
+This packet is sent when the user resizes the game window while a menu is displayed.  It is to inform the server that it may redraw the menu.  Redrawing isn't required unless, for example, you are displaying a lot of data and wish to use the entire game window.  The menu number is the number of the menu that is currently displayed.
+
+
+PACKET_SKY_BOX 42 (0, 1, 3 - 6, 10 - 13)
+
+U2 texture id (negative x)
+U2 texture id (negative y)
+U2 texture id (negative z - below map)
+U2 texture id (positive x)
+U2 texture id (positive y)
+U2 texture id (positive z - above map)
+U1 flags
+  bit 0 - place box on map edges rather than at a very far distance
+
+Selects six textures (see PACKET_TEXTURE_SETUP) to use as a sky box.  Optionally may include only five textures, in which case the negative z texture is skipped.  ...or it may include only one texture, in which case the above-map and four above-ground sides come out of that one texture.  ...or it may include two textures, with the second being like the first, but for the bottom of the map (not yet implemented as I have no such images).  Flags is optional too, just to take the number of variations on this packet to the extreme.
+
+
+PACKET_CLIENT_VERSION 43
+
+U1 format of version information
+
+Only format type 0 is currently defined.
+Format 0 contains the following additional fields:
+
+U4 SVN revision number.
+
+You generally should not use this packet to determine which client features are available, but instead determine this according to what packet types the client offers.  This packet is mainly intended to allow the login server to detect when players are using an older version and suggest that they may want to upgrade.
+
+
+PACKET_PORTAL_COOKIE 44 (0, 20)
+
+B20 twenty bytes of random binary data
+
+This packet only works with the login server, as its purpose is to allow the login server to remember users.  Initially, the login cookie is unset.  The login server may set the cookie by sending this packet to the client with 20 bytes of data in it.  The client will then store the cookie, and send it to the login server when establishing future connections.  The login server may delete the cookie by sending this packet with 0 bytes of data in it.  The client will send an empty packet if it does not have a cookie stored, unless it has PACKET_AUTHENTICATE data it may send instead.  If the client has a cookie, it will send the cookie instead of any PACKET_AUTHENTICATE data.
+
+
+PACKET_PLAYER_SKIN 45 (0, 3)
+
+U1 Player model ID (1 - 255)
+U2 Texture ID (0 - 1529)
+
+Set a texture to use for for a particular player model.  This works in much the same way as PACKET_BLOCK_SETUP, in that the texture is loaded via PACKET_TEXTURE_SETUP, and referenced by the texture id.
+The one byte version of this packet resets the player model texture to the internal default.
+
+
+PACKET_MENU_TEXTURE 46 (11)
+
+U1 index
+U1 column
+U1 line
+U1 width
+U1 height
+U2 texture id
+U1 x
+U1 y
+U1 x
+U1 y
+
+Allows textures to be drawn on server menus.  The X and Y coordinates are such that 0 is the left side of the image and 256 is the right side of the image.  Obviously there is no 256 in a single byte, so a zero for the second X or Y parameter is interpreted as a 256.  So to display an entire texture, just use all zeros.
+
+PACKET_SERVER_NAME 47
+
+B* Server Name
+
+Sets the server name.  Presently, this just adjusts the title bar of the game window to reflect the name of the server.
+
+
+PACKET_PROJECTILE_CREATE 48
+
+U1 projectile type (0, 1, 2);
+F4 projectile x position, in block coordinates
+F4 projectile y position, in block coordinates
+F4 projectile z position, in block coordinates
+F4 projectile u angle (left-right rotation), in radians
+F4 projectile v angle (up-down rotation), in radians
+
+Sent whenever a player has fired a weapon and a projectile has been generated.  The intention of this message is to notify the other clients that a projectile should be drawn on the screen.
+After a projectile has been created, the client will also send PACKET_PROJECTILE_COLLISION to the server to indicate rather a player or block interrupted its path.  Note that only the originating client will send collision messages, and that only blocks or player models count as targets.  A projectile will self-terminate when it leaves the map.
+The projectile type is determined by which mouse button was used to create the projectile:
+0 - create-block button
+1 - destroy-block button
+
+PACKET_PROJECTILE_COLLISION 49
+
+U1 projectile type
+F4 projectile x position, in block coordinates
+F4 projectile y position, in block coordinates
+F4 projectile z position, in block coordinates
+U1 collision type
+U1 thing id
+
+After the client has fired a projectile, it will send this message to indicate that the projectile has hit either a solid block, or a player.  Projectiles otherwise provide no feedback when flying outside of the map boundries.
+Also, collision feedback will only come from the client which originated the projectile.  
+
+The packet contains the type of projectile, which is determined by which mouse
+button was used to create it. The packet also includes the x, y, and z coordinates of where the projectile collided, as well as the type of collision (block or player model).  The thing id will contain either the block type which was hit, or the id of the player model.
+
+
+projectile type values:
+0 - create-block button
+1 - destroy-block button
+
+collision type values:
+0 - block
+1 - player model
