@@ -10,3 +10,5 @@ convert_binaries_to_c_source
 mme
 mme.exe
 build.c
+static/libglfw3.a
+static/libz.a
