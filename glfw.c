@@ -57,6 +57,9 @@ void glfw_initialize() {
   glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
   context_window = glfwCreateWindow(64, 64, "", NULL, NULL);
   glfwMakeContextCurrent(context_window);
+
+  const char *idk = glGetString(GL_RENDERER);
+  printf("glGetString(GL_RENDERER) = \"%s\"\n", idk);
 };
 
 //--page-split-- glfw_terminate
@@ -221,6 +224,8 @@ void glfw_set_window_title(char *title) {
     glfwSetWindowTitle(glfw_window, "Multiplayer Map Editor");
   };
 };
+
+//--page-split-- glfw_fullscreen
 
 void glfw_fullscreen (int enable) {
   static int saved_x = 0, saved_y = 0, saved_width = 0, saved_height = 0;

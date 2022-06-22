@@ -343,7 +343,10 @@ void event_keyboard_key_callback(GLFWwindow *window, int key, int scancode, int 
           strcpy(os_version, build_target);
         #endif
         char string[4096];
-        snprintf(string, 4096, "\e\x0B\x01\e\x09 MME version %s for %s, %d cores, %s, light=%d, textures=%d", build_svn_string, os_version, cpu_core_count, statistics_report, option_lighting, option_textures);
+        snprintf(string, 4096, "\e\x0B\x01\e\x09 MME version "
+        "%s, %s, %d cores, \"%s\", %s, light=%d, textures=%d",
+        build_svn_string, os_version, cpu_core_count, glGetString(GL_RENDERER),
+        statistics_report, option_lighting, option_textures);
         string[4095] = 0;
         packet_send(PACKET_CHAT_MESSAGE, 0, string);
         last_use = on_frame_time;
