@@ -7,7 +7,7 @@ void menus_graphics() {
   int small_blocks = map_data.resolution.x < 0.1625;
 
   if (menu_process_event && KEY_PRESS_EVENT && KEY == GLFW_KEY_ESCAPE) menu_switch(menus_escape);
-  if (gui_window(54, 21, 3)) menu_switch(menus_play);
+  if (gui_window(54, 20, 3)) menu_switch(menus_play);
 
   gui_text(1, 0, "Graphics Options");
 
@@ -48,4 +48,5 @@ void menus_graphics() {
   if (gui_check(4, 18, &option_fsaa_samples, 1, "Antialiasing (higher quality, lower FPS)")) main_restart();
 
   if (gui_check(4, 19, &option_anisotropic_filtering, 1, "Anisotropic Filtering (higher quality, lower FPS)")) main_restart();
+
 };

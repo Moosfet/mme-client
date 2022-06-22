@@ -15,10 +15,10 @@ int option_fog_distance;
 int option_mouse_invert;
 int option_mouse_reverse_unused;
 int option_perspective_angle;
-int option_perspective_perfect;
+int option_anaglyph_enable;
 int option_show_f1_help;
-double option_perspective_pixel_size;
-double option_perspective_distance;
+double option_anaglyph_pixel_size;
+double option_anaglyph_distance;
 int option_fps_display;
 int option_request_vertical_sync;
 int option_noclip;
@@ -49,9 +49,12 @@ int option_key_input[CONTROLS_KEY_LIMIT][2];
 int option_anisotropic_filtering;
 int option_window_location_x;
 int option_window_location_y;
+int option_anaglyph_units;
+double option_pupil_distance;
 
 // unsaved options:
 int option_f3_display = 0;
+int option_anaglyph = 0;
 
 #define OPTION_SIZE 4096
 
@@ -107,9 +110,9 @@ void option_load() {
   option_fog_type = 1;
   option_fog_distance = 256;
   option_perspective_angle = 90;
-  option_perspective_perfect = 0;
-  option_perspective_pixel_size = 0.03;
-  option_perspective_distance = 50.0;
+  option_anaglyph_enable = 0;
+  option_anaglyph_pixel_size = 0.03;
+  option_anaglyph_distance = 50.0;
   option_fps_display = 0;
   option_show_f1_help = 1;
   option_request_vertical_sync = 0;
@@ -140,6 +143,8 @@ void option_load() {
   option_anisotropic_filtering = 0;
   option_window_location_x = 0;
   option_window_location_y = 0;
+  option_anaglyph_units = 0;
+  option_pupil_distance = 5.5;
 
   option_key_reset();
 
@@ -167,9 +172,9 @@ void option_load() {
     READ_WORD(option_fog_type);
     READ_WORD(option_fog_distance);
     READ_BYTE(option_perspective_angle);
-    READ_BYTE(option_perspective_perfect);
-    READ_DOUBLE(option_perspective_pixel_size);
-    READ_DOUBLE(option_perspective_distance);
+    READ_BYTE(option_anaglyph_enable);
+    READ_DOUBLE(option_anaglyph_pixel_size);
+    READ_DOUBLE(option_anaglyph_distance);
     READ_BYTE(option_fps_display);
     file_offset += 1; // option_wom_addict
     READ_BYTE(option_show_f1_help);
@@ -241,6 +246,8 @@ void option_load() {
     READ_UINT(option_key_input[CONTROLS_KEY_BLOCK_REPLACE][1]);
     READ_WORD(option_window_location_x);
     READ_WORD(option_window_location_y);
+    READ_BYTE(option_anaglyph_units);
+    READ_DOUBLE(option_pupil_distance);
 
     fclose(file);
 
@@ -284,9 +291,9 @@ void option_save() {
   WRITE_WORD(option_fog_type);
   WRITE_WORD(option_fog_distance);
   WRITE_BYTE(option_perspective_angle);
-  WRITE_BYTE(option_perspective_perfect);
-  WRITE_DOUBLE(option_perspective_pixel_size);
-  WRITE_DOUBLE(option_perspective_distance);
+  WRITE_BYTE(option_anaglyph_enable);
+  WRITE_DOUBLE(option_anaglyph_pixel_size);
+  WRITE_DOUBLE(option_anaglyph_distance);
   WRITE_BYTE(option_fps_display);
   file_offset += 1; // option_wom_addict
   WRITE_BYTE(option_show_f1_help);
@@ -354,6 +361,8 @@ void option_save() {
   WRITE_UINT(option_key_input[CONTROLS_KEY_BLOCK_REPLACE][1]);
   WRITE_WORD(option_window_location_x);
   WRITE_WORD(option_window_location_y);
+  WRITE_BYTE(option_anaglyph_units);
+  WRITE_DOUBLE(option_pupil_distance);
 
   #ifdef UNIX
   close(open("options.bin", O_CREAT, 0600));

@@ -37,8 +37,9 @@ void menus_escape() {
 
   line = 2;
   if (gui_link(30, line++, "Configure Controls")) menu_switch(menus_controls);
-  if (gui_link(30, line++, "Fog & FPS Settings")) menu_switch(menus_fog);
+  if (gui_link(30, line++, "Fog & Settings")) menu_switch(menus_fog);
   if (gui_link(30, line++, "Graphics Settings")) menu_switch(menus_graphics);
+  if (gui_link(30, line++, "3D Anaglyph Settings")) menu_switch(menus_anaglyph);
   if (gui_link(30, line++, "Perspective Settings")) menu_switch(menus_perspective);
   if (gui_link(30, line++, "Miscellaneous Options")) menu_switch(menus_misc);
   if (gui_link(30, line++, "Fence Post Calculator")) menu_switch(menus_fencepost);

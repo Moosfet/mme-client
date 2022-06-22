@@ -167,7 +167,7 @@ done
 
 # This compiles everything else if any of the header files have changed:
 
-compile alsa argument binaries block build cache chat controls cpu directsound display easy error event glfw group gui lag main map math memory menu menus_autofog menus_chat menus_controls menus_escape menus_exit menus_fencepost menus_fog menus_fps menus_graphics menus_group menus_hacks menus_help menus_misc menus_perspective menus_play menus_server_connect menus_server_disconnect menus_server_error menus_server_loading menus_server_menu menus_sound mixer model network on opengl option packet paint player projectile sanity server sha1 sky sort sound stars statistics texture thread
+compile alsa argument binaries block build cache chat controls cpu directsound display easy error event glfw group gui lag main map math memory menu menus_anaglyph menus_autofog menus_chat menus_controls menus_escape menus_exit menus_fencepost menus_fog menus_fps menus_graphics menus_group menus_hacks menus_help menus_misc menus_perspective menus_play menus_server_connect menus_server_disconnect menus_server_error menus_server_loading menus_server_menu menus_sound mixer model network on opengl option packet paint player projectile sanity server sha1 sky sort sound stars statistics texture thread
 
 # This makes the executable:
 

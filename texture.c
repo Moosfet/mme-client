@@ -2,8 +2,6 @@
 
 int texture_list_base;
 
-// Loads an image file into OpenGL, returns OpenGL texture name.
-
 int texture_width;
 int texture_height;
 int texture_r;
@@ -11,13 +9,19 @@ int texture_g;
 int texture_b;
 int texture_a;
 
+GLuint texture_full_screen;
+GLuint texture_half_screen;
+
+struct structure_texture_data texture_data[TEXTURE_MAX_TEXTURES] = {};
+
 //--page-split-- texture_load
 
-GLuint texture_load(char *file, int size, int flags) {
+GLuint texture_load (char *file, int size, int flags) {
 
   // Loads a texture from file or memory.
   // If size == 0, then file is a pointer to a file name.
   // If size > 0, then file is a pointer to the file in memory.
+  // If name == 0, allocates a new texture, otherwise replaces existing texture.
 
   unsigned char *sort;
   int x, y, n;
@@ -75,120 +79,57 @@ GLuint texture_load(char *file, int size, int flags) {
   texture_a = a / (x * y);
 
   // Generate texture name and select that texture.
-
   GLuint name;
-  glGenTextures(1, &name);
-  glBindTexture(GL_TEXTURE_2D, name);
+  glGenTextures(2, &name);
 
-  // anisotropic filtering
+  for (int i = 0; i < 2; i++) {
 
-  #ifndef GL_TEXTURE_MAX_ANISOTROPY_EXT
-    #define GL_TEXTURE_MAX_ANISOTROPY_EXT 0x84FE
-  #endif
-  #ifndef GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT
-    #define GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT 0x84FF
-  #endif
-
-  if (option_anisotropic_filtering) {
-    float max = 0.0f;
-    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max);
-    if (max > 4.0f) {
-      max = 4.0f;
-    };
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max);
-  };
-
-  if (flags & TEXTURE_FLAG_PIXELATE) {
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  } else {
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  };
-  if (flags & TEXTURE_FLAG_MIPMAP) {
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
-    lag_push(1000, "generating mipmaps");
-    if (0 && ((x) & (x-1)) == 0 && ((y) & (y-1)) == 0) {
-      printf("Mipmapping %d x %d image!\n", x, y);
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-      unsigned char *smaller = NULL; int level = 1;
-      while (x > 1 || y > 1) {
-        if (x > 1 && y > 1) {
-          int nx = x >> 1;
-          int ny = y >> 1;
-          memory_allocate(&smaller, n * nx * ny);
-          for (int yy = 0; yy < ny; yy++) {
-            for (int xx = 0; xx < nx; xx++) {
-              for (int c = 0; c < n; c++) {
-                if (c < 3) {
-                  int t = round(pow(0.25 * pow(data[((2*yy) * x + (2*xx)) * n + c], 2.2) + 0.25 * pow(data[((2*yy) * x + (2*xx+1)) * n + c], 2.2) + 0.25 * pow(data[((2*yy+1) * x + (2*xx)) * n + c], 2.2) + 0.25 * pow(data[((2*yy+1) * x + (2*xx+1)) * n + c], 2.2), 1/2.2));
-                  if (t < 0) t = 0; if (t > 255) t = 255;
-                  smaller[(yy * nx + xx) * n + c] = t;
-                } else {
-                  smaller[(yy * nx + xx) * n + c] = (data[((2*yy) * x + (2*xx)) * n + c] + data[((2*yy) * x + (2*xx+1)) * n + c] + data[((2*yy+1) * x + (2*xx)) * n + c] + data[((2*yy+1) * x + (2*xx+1)) * n + c] + 2) >> 2;
-                };
-              };
-            };
-          };
-          x = nx;
-          y = ny;
-          memory_allocate(&data, 0);
-          data = smaller; smaller = NULL;
-        } else if (x > 1) {
-          int nx = x >> 1;
-          memory_allocate(&smaller, n * nx * y);
-          for (int yy = 0; yy < y; yy++) {
-            for (int xx = 0; xx < nx; xx++) {
-              for (int c = 0; c < n; c++) {
-                if (c < 3) {
-                  int t = round(pow(0.5 * pow(data[(yy * x + (2*xx)) * n + c], 2.2) + 0.5 * pow(data[(yy * x + (2*xx+1)) * n + c], 2.2), 1/2.2));
-                  if (t < 0) t = 0; if (t > 255) t = 255;
-                  smaller[(yy * nx + xx) * n + c] = t;
-                } else {
-                  smaller[(yy * nx + xx) * n + c] = (data[(yy * x + (2*xx)) * n + c] + data[(yy * x + (2*xx+1)) * n + c]) >> 1;
-                };
-              };
-            };
-          };
-          x = nx;
-          memory_allocate(&data, 0);
-          data = smaller; smaller = NULL;
-        } else if (y > 1) {
-          int ny = y >> 1;
-          memory_allocate(&smaller, n * x * ny);
-          for (int yy = 0; yy < ny; yy++) {
-            for (int xx = 0; xx < x; xx++) {
-              for (int c = 0; c < n; c++) {
-                if (c < 3) {
-                  int t = round(0.5 * pow(pow(data[((2*yy) * x + xx) * n + c], 2.2) + 0.5 * pow(data[((2*yy+1) * x + xx) * n + c], 2.2), 1/2.2));
-                  if (t < 0) t = 0; if (t > 255) t = 255;
-                  smaller[(yy * x + xx) * n + c] = t;
-                } else {
-                  int t = data[((2*yy) * x + xx) * n + c] + data[((2*yy+1) * x + xx) * n + c];
-                  if (t & 1) {
-                    if (easy_random(2)) {
-                      t += 1;
-                    } else {
-                      t -= 1;
-                    };
-                  };
-                  smaller[(yy * x + xx) * n + c] = (data[((2*yy) * x + xx) * n + c] + data[((2*yy+1) * x + xx) * n + c]) >> 1;
-                };
-              };
-            };
-          };
-          y = ny;
-          memory_allocate(&data, 0);
-          data = smaller; smaller = NULL;
-        };
-        glTexImage2D(GL_TEXTURE_2D, level++, GL_RGBA, x, y, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    if (i) {
+      for (int i = 0; i < 4 * x * y; i += 4) {
+        int v = (3.5 * data[i] + 4.5 * data[i + 1] + 2.0 * data[i + 2] + 5.0) / 10.0;
+        if (v < 0) v = 0;
+        if (v > 255) v = 255;
+        data[i] = v;
+        data[i + 1] = v;
+        data[i + 2] = v;
       };
-    } else {
-      gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, x, y, GL_RGBA, GL_UNSIGNED_BYTE, data);
-      //gluBuild2DMipmaps(GL_TEXTURE_2D, GL_SRGB_ALPHA, x, y, GL_RGBA, GL_UNSIGNED_BYTE, data);
     };
-    lag_pop();
-  } else {
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+
+    glBindTexture(GL_TEXTURE_2D, name + i);
+
+    // anisotropic filtering
+
+    #ifndef GL_TEXTURE_MAX_ANISOTROPY_EXT
+      #define GL_TEXTURE_MAX_ANISOTROPY_EXT 0x84FE
+    #endif
+    #ifndef GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT
+      #define GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT 0x84FF
+    #endif
+
+    if (option_anisotropic_filtering) {
+      float max = 0.0f;
+      glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max);
+      if (max > 4.0f) {
+        max = 4.0f;
+      };
+      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max);
+    };
+
+    if (flags & TEXTURE_FLAG_PIXELATE) {
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    } else {
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    };
+    if (flags & TEXTURE_FLAG_MIPMAP) {
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+      lag_push(1000, "generating mipmaps");
+      gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, x, y, GL_RGBA, GL_UNSIGNED_BYTE, data);
+      lag_pop();
+    } else {
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    };
+
   };
 
   memory_allocate(&data, 0);
@@ -203,11 +144,6 @@ GLuint texture_load(char *file, int size, int flags) {
 
 };
 
-GLuint texture_full_screen;
-GLuint texture_half_screen;
-
-struct structure_texture_data texture_data[TEXTURE_MAX_TEXTURES] = {};
-
 //--page-split-- texture_list
 
 void texture_list(int texture, char *file, int size, int flags) {
@@ -218,7 +154,7 @@ void texture_list(int texture, char *file, int size, int flags) {
   texture_data[texture].b = texture_b / 255.0;
   texture_data[texture].a = texture_a / 255.0;
   glNewList(texture_list_base + texture, GL_COMPILE);
-  glBindTexture(GL_TEXTURE_2D, texture_data[texture].name);
+  glBindTexture(GL_TEXTURE_2D, texture_data[texture].name + option_anaglyph_enable);
   glEndList();
 };
 
@@ -317,6 +253,16 @@ void texture_close_window() {
     };
   };
   glDeleteLists(texture_list_base, TEXTURE_MAX_TEXTURES);
+};
+
+//--page-split-- texture_reload
+
+void texture_reload () {
+  for (int i = 0; i < TEXTURE_MAX_TEXTURES; i++) {
+    glNewList(texture_list_base + i, GL_COMPILE);
+    glBindTexture(GL_TEXTURE_2D, texture_data[i].name + option_anaglyph_enable);
+    glEndList();
+  };
 };
 
 //--page-split-- texture_reset

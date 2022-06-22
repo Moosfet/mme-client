@@ -384,12 +384,12 @@ void player_movement() {
   if (!player_allow_noclip) player_noclip = 0;
 
   double angle;
-  if (option_perspective_perfect) {
-    angle = 2 * atan(0.5 * display_window_height * option_perspective_pixel_size / option_perspective_distance) / (display_window_height / 2);
+  if (option_anaglyph_enable) {
+    angle = 2 * atan(0.5 * display_window_height * option_anaglyph_pixel_size / option_anaglyph_distance) / (display_window_height / 2);
   } else {
     angle = (map_perspective_angle * M_PI / 180) / display_window_height;
   };
-  angle = 1.0 / 768;
+  //angle = 0.1 * M_PI / 180.0;
 
   struct int_xyz keyboard = {};
 
@@ -403,9 +403,6 @@ void player_movement() {
     mouse.y = player_mouse_y_accumulator;
     player_mouse_x_accumulator = 0;
     player_mouse_y_accumulator = 0;
-
-    // This doesn't belong here, right?
-    //glfw_capture_mouse();
 
     player_position.u -= mouse.x * angle;
     if (option_mouse_invert) {

@@ -599,6 +599,7 @@ struct structure_server_menu {
   char coordinate[4];
 };
 
+void menus_anaglyph();
 void menus_autofog();
 void menus_chat_scroll_reset();
 void menus_chat();
@@ -720,10 +721,10 @@ extern int option_fog_distance;
 extern int option_mouse_invert;
 extern int option_mouse_reverse_unused;
 extern int option_perspective_angle;
-extern int option_perspective_perfect;
+extern int option_anaglyph_enable;
 extern int option_show_f1_help;
-extern double option_perspective_pixel_size;
-extern double option_perspective_distance;
+extern double option_anaglyph_pixel_size;
+extern double option_anaglyph_distance;
 extern int option_fps_display;
 extern int option_request_vertical_sync;
 extern int option_noclip;
@@ -755,6 +756,8 @@ extern int option_anisotropic_filtering;
 extern int option_f3_display;
 extern int option_window_location_x;
 extern int option_window_location_y;
+extern int option_anaglyph_units;
+extern double option_pupil_distance;
 
 void option_key_reset();
 void option_load();
@@ -967,6 +970,7 @@ GLuint texture_load(char *file, int size, int flags);
 void texture_initialize();
 void texture_open_window();
 void texture_close_window();
+void texture_reload();
 void texture_reset();
 
 // thread.h

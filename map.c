@@ -20,6 +20,7 @@ struct structure_render_list {
 };
 
 double map_percentage_in_view = 0.0;
+double map_perspective_angle = 45.0;
 struct structure_map_data map_data = {};
 int map_chunk_bits = 5;
 
@@ -365,12 +366,10 @@ static void draw_selection() {
 
 };
 
-double map_perspective_angle = 45.0;
+//--page-split-- use_map_coordinates
 
 //  double v_fac = tan(0.5 * map_perspective_angle * M_PI / 180);
 //  double h_fac = v_fac * display_window_width / display_window_height;
-
-//--page-split-- use_map_coordinates
 
 static void use_map_coordinates(int eye) {
 
@@ -379,14 +378,14 @@ static void use_map_coordinates(int eye) {
 
   int use_incorrect_perspective = 0;
 
-  if (!option_perspective_perfect) {
+  if (!option_anaglyph_enable) {
     use_incorrect_perspective = 1;
-  } else if (option_perspective_pixel_size <= 0) {
+  } else if (option_anaglyph_pixel_size <= 0) {
     use_incorrect_perspective = 1;
-  } else if (option_perspective_distance <= 0) {
+  } else if (option_anaglyph_distance <= 0) {
     use_incorrect_perspective = 1;
   } else {
-    map_perspective_angle = 2.0 * atan(0.5 * display_window_height * option_perspective_pixel_size / option_perspective_distance) * 180 / M_PI;
+    map_perspective_angle = 2.0 * atan(0.5 * display_window_height * option_anaglyph_pixel_size / option_anaglyph_distance) * 180 / M_PI;
     //printf("dts=%0.1f  sop=%0.3f  vs=%0.1f  angle=%0.3f\n", option_perspective_distance, option_perspective_pixel_size, display_window_height * option_perspective_pixel_size, map_perspective_angle);
   };
 
@@ -395,7 +394,7 @@ static void use_map_coordinates(int eye) {
     double h_factor = v_factor * display_window_width / display_window_height;
     //printf("h_factor = %f  v_factor = %f\n", h_factor, v_factor);
     if (h_factor > 10.0 || h_factor < 0.05 || v_factor > 10.0 || h_factor < 0.05) {
-      option_perspective_perfect = 0;
+      option_anaglyph_enable = 0;
       use_incorrect_perspective = 1;
     };
   };
@@ -412,13 +411,7 @@ static void use_map_coordinates(int eye) {
 
   // Set window coordinates to map coordinates.
   glMatrixMode(GL_PROJECTION); glLoadIdentity();
-  if (eye == 0) {
-    gluPerspective(map_perspective_angle, display_window_height != 0 ? (float) display_window_width / display_window_height : display_window_width, 1.0/16, 4096);
-  } else if (eye == 1) {
-    gluPerspective(map_perspective_angle, display_window_height != 0 ? (float) display_window_width / display_window_height : display_window_width, 2.0, 4096);
-  } else if (eye == 2) {
-    gluPerspective(map_perspective_angle, display_window_height != 0 ? (float) display_window_width / display_window_height : display_window_width, 0.01, 2.0);
-  };
+  gluPerspective(map_perspective_angle, display_window_height != 0 ? (float) display_window_width / display_window_height : display_window_width, 1.0/16, 4096);
   glMatrixMode(GL_MODELVIEW); glLoadIdentity();
   glRotated(-90, 1, 0, 0); glRotated(90, 0, 0, 1);
 
@@ -427,16 +420,16 @@ static void use_map_coordinates(int eye) {
   if (map_data.wrap.y && pp.y >= map_data.dimension.y / 2) pp.y -= map_data.dimension.y;
   if (map_data.wrap.z && pp.z >= map_data.dimension.z / 2) pp.z -= map_data.dimension.z;
 
-  #if 0
-  #define offset 0.031
+  double scale = 0.01;
+  if (option_anaglyph_units) scale /= 2.54;
+  double offset = 0.5 * scale * option_pupil_distance;
   if (eye == 1) {
-    glRotated(atan2(+offset, (option_perspective_distance / 100)) * 180 / M_PI, 0, 0, +1);
+    glRotated(atan2(+offset, scale * option_anaglyph_distance) * 180 / M_PI, 0, 0, +1);
     glTranslated(0.0, -offset, 0.0);
   } else if (eye == 2) {
-    glRotated(atan2(-offset, (option_perspective_distance / 100)) * 180 / M_PI, 0, 0, +1);
+    glRotated(atan2(-offset, scale * option_anaglyph_distance) * 180 / M_PI, 0, 0, +1);
     glTranslated(0.0, +offset, 0.0);
   };
-  #endif
 
   // Rotate camera to player position...
   glRotated(-(pp.v) * 180 / M_PI, 0, -1, 0);
@@ -1955,437 +1948,413 @@ void map_render() {
 
   WHAT("after clearing buffer");
 
-#ifdef ANAGLYPH
+  int do_anaglyph = option_anaglyph_enable && option_pupil_distance > 0.0;
 
-  for (int eye = 1; eye <= 2; eye++) {
-    if (eye == 1) {
-//      glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE);
-    } else {
-//      glColorMask(GL_FALSE, GL_TRUE, GL_TRUE, GL_TRUE);
-    };
-    if (eye == 1) glClear(GL_COLOR_BUFFER_BIT);
+  for (int eye = (do_anaglyph ? 1 : 0); eye < (do_anaglyph ? 3 : 1); eye++) {
+    if (eye == 0) glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+    // yellow blue, filters well, but the yellow is not very dark
+    if (eye == 1) glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE);
+    if (eye == 2) glColorMask(GL_FALSE, GL_FALSE, GL_TRUE, GL_TRUE);
+
+    // red purple, purple visible in both eyes
+    if (eye == 1) glColorMask(GL_TRUE, GL_TRUE, GL_FALSE, GL_TRUE);
+    if (eye == 2) glColorMask(GL_FALSE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+    // yellow purple, purple visible in both eyes
+    if (eye == 1) glColorMask(GL_TRUE, GL_TRUE, GL_FALSE, GL_TRUE);
+    if (eye == 2) glColorMask(GL_FALSE, GL_FALSE, GL_TRUE, GL_TRUE);
+
+    //
+    if (eye == 1) glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE);
+    if (eye == 2) glColorMask(GL_FALSE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+    if (eye < 2) glClear(GL_COLOR_BUFFER_BIT);
+
     glClear(GL_DEPTH_BUFFER_BIT);
     use_map_coordinates(eye);
 
-#else
+    WHAT("after setting coordinates");
 
-  glClear(GL_DEPTH_BUFFER_BIT);
-  glClear(GL_COLOR_BUFFER_BIT);
-  use_map_coordinates(0);
+    if ((option_fog_type & 3) == 2) stars_render();
+    WHAT("after running stars_render()");
 
-#endif
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
 
-  WHAT("after setting coordinates");
-
-  if ((option_fog_type & 3) == 2) stars_render();
-  WHAT("after running stars_render()");
-
-  glEnable(GL_DEPTH_TEST);
-  glEnable(GL_CULL_FACE);
-
-  int sucky_fog = 0;
-  if (option_fog_type & 2) {
-    WHAT("before setting fog options");
-    glEnable(GL_FOG);
-    if (option_fog_type & 1) {
-      glFogfv(GL_FOG_COLOR, (GLfloat[]) {0.75, 0.8, 0.85, 1.0});
-    } else {
-      glFogfv(GL_FOG_COLOR, (GLfloat[]) {0.05, 0.05, 0.05, 0.0});
-    };
-    WHAT("1");
-    glFogi(GL_FOG_MODE, GL_LINEAR);
-    if (option_fog_type & 4) {
-      glFogf(GL_FOG_START, 0.5 * statistics_fog_distance);
-    } else {
-      glFogf(GL_FOG_START, 0.0 * statistics_fog_distance);
-    };
-    WHAT("2");
-    glFogf(GL_FOG_END, 1.0 * statistics_fog_distance);
-    WHAT("3");
-    glHint(GL_FOG_HINT, GL_NICEST);
-    WHAT("after setting fog options");
-    glFogi(0x855A, 0x855B); // get better fog rendering on NVIDIA cards
-    sucky_fog = glGetError();
-    WHAT(NULL);
-  } else {
-    glDisable(GL_FOG);
-  };
-
-  struct double_xyzuv pp = player_view;
-  if (map_data.wrap.x && pp.x >= map_data.dimension.x / 2) pp.x -= map_data.dimension.x;
-  if (map_data.wrap.y && pp.y >= map_data.dimension.y / 2) pp.y -= map_data.dimension.y;
-  if (map_data.wrap.z && pp.z >= map_data.dimension.z / 2) pp.z -= map_data.dimension.z;
-
-  if (option_fog_type == 1) {
-    glDepthMask(GL_FALSE);
-    glEnable(GL_TEXTURE_2D);
-    if (sky_box_type == 1 || sky_box_type == 2) {
-      double x1, x2, y1, y2, z1, z2;
-      if (sky_box_flags & 0x01) {
-        x1 = 0.0;
-        y1 = 0.0;
-        z1 = map_data.sealevel;
-        x2 = map_data.dimension.x;
-        y2 = map_data.dimension.y;
-        z2 = map_data.dimension.z;
+    int sucky_fog = 0;
+    if (option_fog_type & 2) {
+      WHAT("before setting fog options");
+      glEnable(GL_FOG);
+      if (option_fog_type & 1) {
+        glFogfv(GL_FOG_COLOR, (GLfloat[]) {0.75, 0.8, 0.85, 1.0});
       } else {
-        x1 = pp.x - 1024;
-        x2 = pp.x + 1024;
-        y1 = pp.y - 1024;
-        y2 = pp.y + 1024;
-        z1 = pp.z + 0;
-        z2 = pp.z + 1024;
+        glFogfv(GL_FOG_COLOR, (GLfloat[]) {0.05, 0.05, 0.05, 0.0});
       };
-      glColor3f(1.0, 1.0, 1.0);
-      glCallList(texture_list_base + sky_box_texture[0]);
-      glBegin(GL_QUADS);
-      // north
-      glTexCoord2f(0.25, 0.00); glVertex3f(x1, y2, z1);
-      glTexCoord2f(0.75, 0.00); glVertex3f(x2, y2, z1);
-      glTexCoord2f(0.75, 0.25); glVertex3f(x2, y2, z2);
-      glTexCoord2f(0.25, 0.25); glVertex3f(x1, y2, z2);
-      // up
-      glTexCoord2f(0.25, 0.25); glVertex3f(x1, y2, z2);
-      glTexCoord2f(0.75, 0.25); glVertex3f(x2, y2, z2);
-      glTexCoord2f(0.75, 0.75); glVertex3f(x2, y1, z2);
-      glTexCoord2f(0.25, 0.75); glVertex3f(x1, y1, z2);
-      // south
-      glTexCoord2f(0.75, 1.00); glVertex3f(x2, y1, z1);
-      glTexCoord2f(0.25, 1.00); glVertex3f(x1, y1, z1);
-      glTexCoord2f(0.25, 0.75); glVertex3f(x1, y1, z2);
-      glTexCoord2f(0.75, 0.75); glVertex3f(x2, y1, z2);
-      // west
-      glTexCoord2f(0.00, 0.75); glVertex3f(x1, y1, z1);
-      glTexCoord2f(0.00, 0.25); glVertex3f(x1, y2, z1);
-      glTexCoord2f(0.25, 0.25); glVertex3f(x1, y2, z2);
-      glTexCoord2f(0.25, 0.75); glVertex3f(x1, y1, z2);
-      // east
-      glTexCoord2f(1.00, 0.25); glVertex3f(x2, y2, z1);
-      glTexCoord2f(1.00, 0.75); glVertex3f(x2, y1, z1);
-      glTexCoord2f(0.75, 0.75); glVertex3f(x2, y1, z2);
-      glTexCoord2f(0.75, 0.25); glVertex3f(x2, y2, z2);
-      glEnd();
-    } else if (sky_box_type == 5 || sky_box_type == 6) {
-      double x1, x2, y1, y2, z1, z2;
-      if (sky_box_flags & 0x01) {
-        x1 = 0.0;
-        y1 = 0.0;
-        z1 = 0.0;
-        x2 = map_data.dimension.x;
-        y2 = map_data.dimension.y;
-        z2 = map_data.dimension.z;
+      WHAT("1");
+      glFogi(GL_FOG_MODE, GL_LINEAR);
+      if (option_fog_type & 4) {
+        glFogf(GL_FOG_START, 0.5 * statistics_fog_distance);
       } else {
-        x1 = pp.x - 1024;
-        x2 = pp.x + 1024;
-        y1 = pp.y - 1024;
-        y2 = pp.y + 1024;
-        z1 = pp.z - 1024;
-        z2 = pp.z + 1024;
+        glFogf(GL_FOG_START, 0.0 * statistics_fog_distance);
       };
-      glColor3f(1.0, 1.0, 1.0);
-      // west
-      glCallList(texture_list_base + sky_box_texture[0]);
-      glBegin(GL_QUADS);
-      glTexCoord2f(0.0, 0.0); glVertex3f(x1, y1, z1);
-      glTexCoord2f(1.0, 0.0); glVertex3f(x1, y2, z1);
-      glTexCoord2f(1.0, 1.0); glVertex3f(x1, y2, z2);
-      glTexCoord2f(0.0, 1.0); glVertex3f(x1, y1, z2);
-      glEnd();
-      // south
-      glCallList(texture_list_base + sky_box_texture[1]);
-      glBegin(GL_QUADS);
-      glTexCoord2f(0.0, 0.0); glVertex3f(x2, y1, z1);
-      glTexCoord2f(1.0, 0.0); glVertex3f(x1, y1, z1);
-      glTexCoord2f(1.0, 1.0); glVertex3f(x1, y1, z2);
-      glTexCoord2f(0.0, 1.0); glVertex3f(x2, y1, z2);
-      glEnd();
-      if (sky_box_type == 6) {
-        // down
-        glCallList(texture_list_base + sky_box_texture[2]);
+      WHAT("2");
+      glFogf(GL_FOG_END, 1.0 * statistics_fog_distance);
+      WHAT("3");
+      glHint(GL_FOG_HINT, GL_NICEST);
+      WHAT("after setting fog options");
+      glFogi(0x855A, 0x855B); // get better fog rendering on NVIDIA cards
+      sucky_fog = glGetError();
+      WHAT(NULL);
+    } else {
+      glDisable(GL_FOG);
+    };
+
+    struct double_xyzuv pp = player_view;
+    if (map_data.wrap.x && pp.x >= map_data.dimension.x / 2) pp.x -= map_data.dimension.x;
+    if (map_data.wrap.y && pp.y >= map_data.dimension.y / 2) pp.y -= map_data.dimension.y;
+    if (map_data.wrap.z && pp.z >= map_data.dimension.z / 2) pp.z -= map_data.dimension.z;
+
+    if (option_fog_type == 1) {
+      glDepthMask(GL_FALSE);
+      glEnable(GL_TEXTURE_2D);
+      if (sky_box_type == 1 || sky_box_type == 2) {
+        double x1, x2, y1, y2, z1, z2;
+        if (sky_box_flags & 0x01) {
+          x1 = 0.0;
+          y1 = 0.0;
+          z1 = map_data.sealevel;
+          x2 = map_data.dimension.x;
+          y2 = map_data.dimension.y;
+          z2 = map_data.dimension.z;
+        } else {
+          x1 = pp.x - 1024;
+          x2 = pp.x + 1024;
+          y1 = pp.y - 1024;
+          y2 = pp.y + 1024;
+          z1 = pp.z + 0;
+          z2 = pp.z + 1024;
+        };
+        glColor3f(1.0, 1.0, 1.0);
+        glCallList(texture_list_base + sky_box_texture[0]);
+        glBegin(GL_QUADS);
+        // north
+        glTexCoord2f(0.25, 0.00); glVertex3f(x1, y2, z1);
+        glTexCoord2f(0.75, 0.00); glVertex3f(x2, y2, z1);
+        glTexCoord2f(0.75, 0.25); glVertex3f(x2, y2, z2);
+        glTexCoord2f(0.25, 0.25); glVertex3f(x1, y2, z2);
+        // up
+        glTexCoord2f(0.25, 0.25); glVertex3f(x1, y2, z2);
+        glTexCoord2f(0.75, 0.25); glVertex3f(x2, y2, z2);
+        glTexCoord2f(0.75, 0.75); glVertex3f(x2, y1, z2);
+        glTexCoord2f(0.25, 0.75); glVertex3f(x1, y1, z2);
+        // south
+        glTexCoord2f(0.75, 1.00); glVertex3f(x2, y1, z1);
+        glTexCoord2f(0.25, 1.00); glVertex3f(x1, y1, z1);
+        glTexCoord2f(0.25, 0.75); glVertex3f(x1, y1, z2);
+        glTexCoord2f(0.75, 0.75); glVertex3f(x2, y1, z2);
+        // west
+        glTexCoord2f(0.00, 0.75); glVertex3f(x1, y1, z1);
+        glTexCoord2f(0.00, 0.25); glVertex3f(x1, y2, z1);
+        glTexCoord2f(0.25, 0.25); glVertex3f(x1, y2, z2);
+        glTexCoord2f(0.25, 0.75); glVertex3f(x1, y1, z2);
+        // east
+        glTexCoord2f(1.00, 0.25); glVertex3f(x2, y2, z1);
+        glTexCoord2f(1.00, 0.75); glVertex3f(x2, y1, z1);
+        glTexCoord2f(0.75, 0.75); glVertex3f(x2, y1, z2);
+        glTexCoord2f(0.75, 0.25); glVertex3f(x2, y2, z2);
+        glEnd();
+      } else if (sky_box_type == 5 || sky_box_type == 6) {
+        double x1, x2, y1, y2, z1, z2;
+        if (sky_box_flags & 0x01) {
+          x1 = 0.0;
+          y1 = 0.0;
+          z1 = 0.0;
+          x2 = map_data.dimension.x;
+          y2 = map_data.dimension.y;
+          z2 = map_data.dimension.z;
+        } else {
+          x1 = pp.x - 1024;
+          x2 = pp.x + 1024;
+          y1 = pp.y - 1024;
+          y2 = pp.y + 1024;
+          z1 = pp.z - 1024;
+          z2 = pp.z + 1024;
+        };
+        glColor3f(1.0, 1.0, 1.0);
+        // west
+        glCallList(texture_list_base + sky_box_texture[0]);
         glBegin(GL_QUADS);
         glTexCoord2f(0.0, 0.0); glVertex3f(x1, y1, z1);
+        glTexCoord2f(1.0, 0.0); glVertex3f(x1, y2, z1);
+        glTexCoord2f(1.0, 1.0); glVertex3f(x1, y2, z2);
+        glTexCoord2f(0.0, 1.0); glVertex3f(x1, y1, z2);
+        glEnd();
+        // south
+        glCallList(texture_list_base + sky_box_texture[1]);
+        glBegin(GL_QUADS);
+        glTexCoord2f(0.0, 0.0); glVertex3f(x2, y1, z1);
+        glTexCoord2f(1.0, 0.0); glVertex3f(x1, y1, z1);
+        glTexCoord2f(1.0, 1.0); glVertex3f(x1, y1, z2);
+        glTexCoord2f(0.0, 1.0); glVertex3f(x2, y1, z2);
+        glEnd();
+        if (sky_box_type == 6) {
+          // down
+          glCallList(texture_list_base + sky_box_texture[2]);
+          glBegin(GL_QUADS);
+          glTexCoord2f(0.0, 0.0); glVertex3f(x1, y1, z1);
+          glTexCoord2f(1.0, 0.0); glVertex3f(x2, y1, z1);
+          glTexCoord2f(1.0, 1.0); glVertex3f(x2, y2, z1);
+          glTexCoord2f(0.0, 1.0); glVertex3f(x1, y2, z1);
+          glEnd();
+        };
+        // east
+        glCallList(texture_list_base + sky_box_texture[3]);
+        glBegin(GL_QUADS);
+        glTexCoord2f(0.0, 0.0); glVertex3f(x2, y2, z1);
         glTexCoord2f(1.0, 0.0); glVertex3f(x2, y1, z1);
-        glTexCoord2f(1.0, 1.0); glVertex3f(x2, y2, z1);
-        glTexCoord2f(0.0, 1.0); glVertex3f(x1, y2, z1);
+        glTexCoord2f(1.0, 1.0); glVertex3f(x2, y1, z2);
+        glTexCoord2f(0.0, 1.0); glVertex3f(x2, y2, z2);
+        glEnd();
+        // north
+        glCallList(texture_list_base + sky_box_texture[4]);
+        glBegin(GL_QUADS);
+        glTexCoord2f(0.0, 0.0); glVertex3f(x1, y2, z1);
+        glTexCoord2f(1.0, 0.0); glVertex3f(x2, y2, z1);
+        glTexCoord2f(1.0, 1.0); glVertex3f(x2, y2, z2);
+        glTexCoord2f(0.0, 1.0); glVertex3f(x1, y2, z2);
+        glEnd();
+        // up
+        glCallList(texture_list_base + sky_box_texture[5]);
+        glBegin(GL_QUADS);
+        glTexCoord2f(0.0, 0.0); glVertex3f(x1, y2, z2);
+        glTexCoord2f(1.0, 0.0); glVertex3f(x2, y2, z2);
+        glTexCoord2f(1.0, 1.0); glVertex3f(x2, y1, z2);
+        glTexCoord2f(0.0, 1.0); glVertex3f(x1, y1, z2);
         glEnd();
       };
-      // east
-      glCallList(texture_list_base + sky_box_texture[3]);
-      glBegin(GL_QUADS);
-      glTexCoord2f(0.0, 0.0); glVertex3f(x2, y2, z1);
-      glTexCoord2f(1.0, 0.0); glVertex3f(x2, y1, z1);
-      glTexCoord2f(1.0, 1.0); glVertex3f(x2, y1, z2);
-      glTexCoord2f(0.0, 1.0); glVertex3f(x2, y2, z2);
-      glEnd();
-      // north
-      glCallList(texture_list_base + sky_box_texture[4]);
-      glBegin(GL_QUADS);
-      glTexCoord2f(0.0, 0.0); glVertex3f(x1, y2, z1);
-      glTexCoord2f(1.0, 0.0); glVertex3f(x2, y2, z1);
-      glTexCoord2f(1.0, 1.0); glVertex3f(x2, y2, z2);
-      glTexCoord2f(0.0, 1.0); glVertex3f(x1, y2, z2);
-      glEnd();
-      // up
-      glCallList(texture_list_base + sky_box_texture[5]);
-      glBegin(GL_QUADS);
-      glTexCoord2f(0.0, 0.0); glVertex3f(x1, y2, z2);
-      glTexCoord2f(1.0, 0.0); glVertex3f(x2, y2, z2);
-      glTexCoord2f(1.0, 1.0); glVertex3f(x2, y1, z2);
-      glTexCoord2f(0.0, 1.0); glVertex3f(x1, y1, z2);
-      glEnd();
+      glDisable(GL_TEXTURE_2D);
+      glDepthMask(GL_TRUE);
     };
-    glDisable(GL_TEXTURE_2D);
-    glDepthMask(GL_TRUE);
-  };
 
-  // Draw "edge of map" texture.
+    // Draw "edge of map" texture.
 
-  #if 0
-  if (option_fog_type == 1 && sky_box_type != 0 && sky_box_flags & 0x01 == 0) {
-    int x1 = 0.0;
-    int y1 = 0.0;
-    int z1 = 0.0;
-    int x2 = map_data.dimension.x;
-    int y2 = map_data.dimension.y;
-    int z2 = map_data.sealevel;
-    glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, texture_data[TEXTURE_MAP_EDGE].name);
-    glColor3f(1.0, 1.0, 1.0);
-    glBegin(GL_QUADS);
-    glTexCoord2f(x1, y1); glVertex3f(x1, y1, z1);
-    glTexCoord2f(x2, y1); glVertex3f(x2, y1, z1);
-    glTexCoord2f(x2, y2); glVertex3f(x2, y2, z1);
-    glTexCoord2f(x1, y2); glVertex3f(x1, y2, z1);
-    glTexCoord2f(x1, z1); glVertex3f(x1, y2, z1);
-    glTexCoord2f(x2, z1); glVertex3f(x2, y2, z1);
-    glTexCoord2f(x2, z2); glVertex3f(x2, y2, z2);
-    glTexCoord2f(x1, z2); glVertex3f(x1, y2, z2);
-    glTexCoord2f(y1, z1); glVertex3f(x1, y1, z1);
-    glTexCoord2f(y2, z1); glVertex3f(x1, y2, z1);
-    glTexCoord2f(y2, z2); glVertex3f(x1, y2, z2);
-    glTexCoord2f(y1, z2); glVertex3f(x1, y1, z2);
-    glTexCoord2f(x1, z1); glVertex3f(x2, y1, z1);
-    glTexCoord2f(x2, z1); glVertex3f(x1, y1, z1);
-    glTexCoord2f(x2, z2); glVertex3f(x1, y1, z2);
-    glTexCoord2f(x1, z2); glVertex3f(x2, y1, z2);
-    glTexCoord2f(y1, z1); glVertex3f(x2, y2, z1);
-    glTexCoord2f(y2, z1); glVertex3f(x2, y1, z1);
-    glTexCoord2f(y2, z2); glVertex3f(x2, y1, z2);
-    glTexCoord2f(y1, z2); glVertex3f(x2, y2, z2);
-    glEnd();
-    glDisable(GL_TEXTURE_2D);
-  };
-  #endif
-
-  struct int_xyz pc;
-  pc.x = ((int) floor(pp.x)) >> chunk_bits;
-  pc.y = ((int) floor(pp.y)) >> chunk_bits;
-  pc.z = ((int) floor(pp.z)) >> chunk_bits;
-
-  // This sucks...
-  #if 0
-  if (!option_file.automatic_fog && map_data.wrap) {
-    if (f < chunk_dimension.x) f = chunk_dimension.x;
-    if (f < chunk_dimension.y) f = chunk_dimension.y;
-    if (f < chunk_dimension.z) f = chunk_dimension.z;
-  };
-  #endif
-
-  // Determine where all chunk corners are, in respect to visibility on screen.
-  // This is used later to determine which chunks to render.
-
-  lag_push(1, "corner positions");
-  int corner[chunk_dimension.x + 1][chunk_dimension.y + 1][chunk_dimension.z + 1];
-  memset(corner, 0, sizeof(int) * (chunk_dimension.x + 1) * (chunk_dimension.y + 1) * (chunk_dimension.z + 1));
-  double cos_u = cos(-pp.u); double sin_u = sin(-pp.u);
-  double cos_v = cos(-pp.v); double sin_v = sin(-pp.v);
-  double v_fac = tan(0.5 * map_perspective_angle * M_PI / 180);
-  double h_fac = v_fac * display_window_width / display_window_height;
-  for (int cz = 0; cz <= map_data.dimension.z; cz += chunk_size) {
-    for (int cy = 0; cy <= map_data.dimension.y; cy += chunk_size) {
-      for (int cx = 0; cx <= map_data.dimension.x; cx += chunk_size) {
-        struct double_xyz c = {cx, cy, cz}; struct double_xyz t;
-        if (map_data.wrap.x && c.x - pp.x >= map_data.dimension.x / 2) c.x -= map_data.dimension.x;
-        if (map_data.wrap.y && c.y - pp.y >= map_data.dimension.y / 2) c.y -= map_data.dimension.y;
-        if (map_data.wrap.z && c.z - pp.z >= map_data.dimension.z / 2) c.z -= map_data.dimension.z;
-        c.x -= pp.x; c.x *= map_data.resolution.x;
-        c.y -= pp.y; c.y *= map_data.resolution.y;
-        c.z -= pp.z; c.z *= map_data.resolution.z;
-        t.x = c.x * cos_u - c.y * sin_u; c.y = c.x * sin_u + c.y * cos_u; c.x = t.x;
-        t.x = c.x * cos_v - c.z * sin_v; c.z = c.x * sin_v + c.z * cos_v; c.x = t.x;
-        if (c.y > h_fac * c.x) corner[cx >> chunk_bits][cy >> chunk_bits][cz >> chunk_bits] |= 1;
-        if (c.y < h_fac * -c.x) corner[cx >> chunk_bits][cy >> chunk_bits][cz >> chunk_bits] |= 2;
-        if (c.z > v_fac * c.x) corner[cx >> chunk_bits][cy >> chunk_bits][cz >> chunk_bits] |= 4;
-        if (c.z < v_fac * -c.x) corner[cx >> chunk_bits][cy >> chunk_bits][cz >> chunk_bits] |= 8;
-        //if ((option_fog_type & 3)) {
-          if (sucky_fog) {
-            if (c.x > statistics_fog_distance) corner[cx >> chunk_bits][cy >> chunk_bits][cz >> chunk_bits] |= 16;
-          } else {
-            if (sqrt(c.x * c.x + c.y * c.y + c.z * c.z) > statistics_fog_distance) corner[cx >> chunk_bits][cy >> chunk_bits][cz >> chunk_bits] |= 16;
-          };
-        //};
-      };
+    #if 0
+    if (option_fog_type == 1 && sky_box_type != 0 && sky_box_flags & 0x01 == 0) {
+      int x1 = 0.0;
+      int y1 = 0.0;
+      int z1 = 0.0;
+      int x2 = map_data.dimension.x;
+      int y2 = map_data.dimension.y;
+      int z2 = map_data.sealevel;
+      glEnable(GL_TEXTURE_2D);
+      glBindTexture(GL_TEXTURE_2D, texture_data[TEXTURE_MAP_EDGE].name);
+      glColor3f(1.0, 1.0, 1.0);
+      glBegin(GL_QUADS);
+      glTexCoord2f(x1, y1); glVertex3f(x1, y1, z1);
+      glTexCoord2f(x2, y1); glVertex3f(x2, y1, z1);
+      glTexCoord2f(x2, y2); glVertex3f(x2, y2, z1);
+      glTexCoord2f(x1, y2); glVertex3f(x1, y2, z1);
+      glTexCoord2f(x1, z1); glVertex3f(x1, y2, z1);
+      glTexCoord2f(x2, z1); glVertex3f(x2, y2, z1);
+      glTexCoord2f(x2, z2); glVertex3f(x2, y2, z2);
+      glTexCoord2f(x1, z2); glVertex3f(x1, y2, z2);
+      glTexCoord2f(y1, z1); glVertex3f(x1, y1, z1);
+      glTexCoord2f(y2, z1); glVertex3f(x1, y2, z1);
+      glTexCoord2f(y2, z2); glVertex3f(x1, y2, z2);
+      glTexCoord2f(y1, z2); glVertex3f(x1, y1, z2);
+      glTexCoord2f(x1, z1); glVertex3f(x2, y1, z1);
+      glTexCoord2f(x2, z1); glVertex3f(x1, y1, z1);
+      glTexCoord2f(x2, z2); glVertex3f(x1, y1, z2);
+      glTexCoord2f(x1, z2); glVertex3f(x2, y1, z2);
+      glTexCoord2f(y1, z1); glVertex3f(x2, y2, z1);
+      glTexCoord2f(y2, z1); glVertex3f(x2, y1, z1);
+      glTexCoord2f(y2, z2); glVertex3f(x2, y1, z2);
+      glTexCoord2f(y1, z2); glVertex3f(x2, y2, z2);
+      glEnd();
+      glDisable(GL_TEXTURE_2D);
     };
-  };
-  lag_pop();
+    #endif
 
-  // Make an array to track which chunks are actually rendered,
-  // in order to test that ones out of view are not rendered.
+    struct int_xyz pc;
+    pc.x = ((int) floor(pp.x)) >> chunk_bits;
+    pc.y = ((int) floor(pp.y)) >> chunk_bits;
+    pc.z = ((int) floor(pp.z)) >> chunk_bits;
 
-  #if 0
-  int fudge[chunk_dimension.x][chunk_dimension.y];
-  memset(fudge, 0, sizeof(int) * chunk_dimension.x * chunk_dimension.y);
-  int rendered_chunks = 0, total_chunks = 0;
-  #endif
+    // Determine where all chunk corners are, in respect to visibility on screen.
+    // This is used later to determine which chunks to render.
 
-  WHAT("before rendering map");
-
-  #if 0
-  struct int_xyz block;
-  block.x = floor(player_position.x);
-  block.y = floor(player_position.y);
-  block.z = floor(player_position.z);
-  int type = map_get_block_type(block);
-  if (type != 0 && block_data[type].impassable) {
-    glFrontFace(GL_CW);
-  } else {
-    glFrontFace(GL_CCW);
-  };
-  #endif
-
-  lag_push(1, "chunk visibility");
-  int chunks_in_view = 0;
-  for (int layer = 0; layer < chunk_limit; layer += chunk_dimension.x * chunk_dimension.y * chunk_dimension.z) {
-    if (layer) glDepthMask(GL_FALSE);
-    for (int z = 0; z < chunk_dimension.z; z++) {
-      for (int y = 0; y < chunk_dimension.y; y++) {
-        for (int x = 0; x < chunk_dimension.x; x++) {
-          struct int_xyz cc = {x, y, z};
-          if (map_data.wrap.x) {
-            if (cc.x - pc.x > chunk_dimension.x >> 1) cc.x -= chunk_dimension.x;
-            if (!(chunk_dimension.x & 1) && cc.x - pc.x == chunk_dimension.x >> 1) continue;
-          };
-          if (map_data.wrap.y) {
-            if (cc.y - pc.y > chunk_dimension.y >> 1) cc.y -= chunk_dimension.y;
-            if (!(chunk_dimension.y & 1) && cc.y - pc.y == chunk_dimension.y >> 1) continue;
-          };
-          if (map_data.wrap.z) {
-            if (cc.z - pc.z > chunk_dimension.z >> 1) cc.z -= chunk_dimension.z;
-            if (!(chunk_dimension.z & 1) && cc.z - pc.z == chunk_dimension.z >> 1) continue;
-          };
-          // Let's see if any of the eight corners of the chunk should be visible,
-          // and if not, then let's not render that chunk since it isn't visible.
-          int invisible = -1;
-          invisible &= corner[x+0][y+0][z+0];
-          invisible &= corner[x+1][y+0][z+0];
-          invisible &= corner[x+0][y+1][z+0];
-          invisible &= corner[x+1][y+1][z+0];
-          invisible &= corner[x+0][y+0][z+1];
-          invisible &= corner[x+1][y+0][z+1];
-          invisible &= corner[x+0][y+1][z+1];
-          invisible &= corner[x+1][y+1][z+1];
-          if (invisible) {
-            chunk_map(cc.x, cc.y, cc.z) &= ~CM_VISIBLE;
-          } else {
-            chunk_map(cc.x, cc.y, cc.z) |= CM_VISIBLE;
-            glPushMatrix();
-            struct int_xyz translate = {};
-            if (cc.x < 0) {
-              translate.x = -map_data.dimension.x;
-              cc.x += chunk_dimension.x;
+    lag_push(1, "corner positions");
+    int corner[chunk_dimension.x + 1][chunk_dimension.y + 1][chunk_dimension.z + 1];
+    memset(corner, 0, sizeof(int) * (chunk_dimension.x + 1) * (chunk_dimension.y + 1) * (chunk_dimension.z + 1));
+    double cos_u = cos(-pp.u); double sin_u = sin(-pp.u);
+    double cos_v = cos(-pp.v); double sin_v = sin(-pp.v);
+    double v_fac = tan(0.5 * map_perspective_angle * M_PI / 180);
+    double h_fac = v_fac * display_window_width / display_window_height;
+    for (int cz = 0; cz <= map_data.dimension.z; cz += chunk_size) {
+      for (int cy = 0; cy <= map_data.dimension.y; cy += chunk_size) {
+        for (int cx = 0; cx <= map_data.dimension.x; cx += chunk_size) {
+          struct double_xyz c = {cx, cy, cz}; struct double_xyz t;
+          if (map_data.wrap.x && c.x - pp.x >= map_data.dimension.x / 2) c.x -= map_data.dimension.x;
+          if (map_data.wrap.y && c.y - pp.y >= map_data.dimension.y / 2) c.y -= map_data.dimension.y;
+          if (map_data.wrap.z && c.z - pp.z >= map_data.dimension.z / 2) c.z -= map_data.dimension.z;
+          c.x -= pp.x; c.x *= map_data.resolution.x;
+          c.y -= pp.y; c.y *= map_data.resolution.y;
+          c.z -= pp.z; c.z *= map_data.resolution.z;
+          t.x = c.x * cos_u - c.y * sin_u; c.y = c.x * sin_u + c.y * cos_u; c.x = t.x;
+          t.x = c.x * cos_v - c.z * sin_v; c.z = c.x * sin_v + c.z * cos_v; c.x = t.x;
+          if (c.y > h_fac * c.x) corner[cx >> chunk_bits][cy >> chunk_bits][cz >> chunk_bits] |= 1;
+          if (c.y < h_fac * -c.x) corner[cx >> chunk_bits][cy >> chunk_bits][cz >> chunk_bits] |= 2;
+          if (c.z > v_fac * c.x) corner[cx >> chunk_bits][cy >> chunk_bits][cz >> chunk_bits] |= 4;
+          if (c.z < v_fac * -c.x) corner[cx >> chunk_bits][cy >> chunk_bits][cz >> chunk_bits] |= 8;
+          //if ((option_fog_type & 3)) {
+            if (sucky_fog) {
+              if (c.x > statistics_fog_distance) corner[cx >> chunk_bits][cy >> chunk_bits][cz >> chunk_bits] |= 16;
+            } else {
+              if (sqrt(c.x * c.x + c.y * c.y + c.z * c.z) > statistics_fog_distance) corner[cx >> chunk_bits][cy >> chunk_bits][cz >> chunk_bits] |= 16;
             };
-            if (cc.y < 0) {
-              translate.y = -map_data.dimension.y;
-              cc.y += chunk_dimension.y;
-            };
-            if (cc.z < 0) {
-              translate.z = -map_data.dimension.z;
-              cc.z += chunk_dimension.z;
-            };
-            chunks_in_view++;
-            glTranslated(translate.x, translate.y, translate.z);
-            glCallList(chunk_list_base + layer + chunk_index(cc.x, cc.y, cc.z));
-            #if 0
-            if (cc.z == chunk_dimension.z / 2) {
-              fudge[cc.x][cc.y] = 1;
-            };
-            #endif
-            if (glGetError()) printf("Error after chunk (%d, %d, %d)\n", cc.x, cc.y, cc.z);
-            glPopMatrix();
-            //rendered_chunks++;
-          };
-          //total_chunks++;
+          //};
         };
       };
     };
-    if (layer) glDepthMask(GL_TRUE);
-    else {
-      WHAT("after rendering map");
-      lag_push(1, "model_render()");
-      model_render();
-      lag_pop();
-      WHAT("after rendering players");
-      lag_push(1, "projectile_render()");
-      projectile_render();
-      lag_pop();
-      WHAT("after rendering projectiles");
+    lag_pop();
+
+    // Make an array to track which chunks are actually rendered,
+    // in order to test that ones out of view are not rendered.
+
+    #if 0
+    int fudge[chunk_dimension.x][chunk_dimension.y];
+    memset(fudge, 0, sizeof(int) * chunk_dimension.x * chunk_dimension.y);
+    int rendered_chunks = 0, total_chunks = 0;
+    #endif
+
+    WHAT("before rendering map");
+
+    #if 0
+    struct int_xyz block;
+    block.x = floor(player_position.x);
+    block.y = floor(player_position.y);
+    block.z = floor(player_position.z);
+    int type = map_get_block_type(block);
+    if (type != 0 && block_data[type].impassable) {
+      glFrontFace(GL_CW);
+    } else {
+      glFrontFace(GL_CCW);
     };
-  };
-  map_percentage_in_view = 100.0 * chunks_in_view / chunk_limit;
-  lag_pop();
+    #endif
 
-  WHAT("after rendering map");
-
-  #if 0
-  char buffer[1048576];
-  char *pointer = buffer;
-  pointer += sprintf(pointer, "\e[H");
-  for (int y = chunk_dimension.y - 1; y >= 0; y--) {
-    for (int x = 0; x < chunk_dimension.x; x++) {
-      if (fudge[x][y]) {
-        pointer += sprintf(pointer, "[]");
-      } else {
-        pointer += sprintf(pointer, "  ");
+    lag_push(1, "chunk visibility");
+    int chunks_in_view = 0;
+    for (int layer = 0; layer < chunk_limit; layer += chunk_dimension.x * chunk_dimension.y * chunk_dimension.z) {
+      if (layer) glDepthMask(GL_FALSE);
+      for (int z = 0; z < chunk_dimension.z; z++) {
+        for (int y = 0; y < chunk_dimension.y; y++) {
+          for (int x = 0; x < chunk_dimension.x; x++) {
+            struct int_xyz cc = {x, y, z};
+            // Let's see if any of the eight corners of the chunk should be visible,
+            // and if not, then let's not render that chunk since it isn't visible.
+            int invisible = -1;
+            invisible &= corner[x+0][y+0][z+0];
+            invisible &= corner[x+1][y+0][z+0];
+            invisible &= corner[x+0][y+1][z+0];
+            invisible &= corner[x+1][y+1][z+0];
+            invisible &= corner[x+0][y+0][z+1];
+            invisible &= corner[x+1][y+0][z+1];
+            invisible &= corner[x+0][y+1][z+1];
+            invisible &= corner[x+1][y+1][z+1];
+            if (invisible) {
+              chunk_map(cc.x, cc.y, cc.z) &= ~CM_VISIBLE;
+            } else {
+              chunk_map(cc.x, cc.y, cc.z) |= CM_VISIBLE;
+              //glPushMatrix();
+              //struct int_xyz translate = {};
+              //if (cc.x < 0) {
+              //  translate.x = -map_data.dimension.x;
+              //  cc.x += chunk_dimension.x;
+              //};
+              //if (cc.y < 0) {
+              //  translate.y = -map_data.dimension.y;
+              //  cc.y += chunk_dimension.y;
+              //};
+              //if (cc.z < 0) {
+              //  translate.z = -map_data.dimension.z;
+              //  cc.z += chunk_dimension.z;
+              //};
+              chunks_in_view++;
+              //glTranslated(translate.x, translate.y, translate.z);
+              glCallList(chunk_list_base + layer + chunk_index(cc.x, cc.y, cc.z));
+              if (glGetError()) printf("Error after chunk (%d, %d, %d)\n", cc.x, cc.y, cc.z);
+              //glPopMatrix();
+              //rendered_chunks++;
+            };
+            //total_chunks++;
+          };
+        };
+      };
+      if (layer) glDepthMask(GL_TRUE);
+      else {
+        WHAT("after rendering map");
+        lag_push(1, "model_render()");
+        model_render();
+        lag_pop();
+        WHAT("after rendering players");
+        lag_push(1, "projectile_render()");
+        projectile_render();
+        lag_pop();
+        WHAT("after rendering projectiles");
       };
     };
-    pointer += sprintf(pointer, "\e[K\n");
-  };
-  int percent = round(100.0 * rendered_chunks / total_chunks);
-  pointer += sprintf(pointer, "Rendered %d%% of chunks.\e[K\n", percent);
-  pointer += sprintf(pointer, "map_perspective_angle = %0.1f.\e[K\n", map_perspective_angle);
-  printf("%s", buffer);
-  #endif
+    map_percentage_in_view = 100.0 * chunks_in_view / chunk_limit;
+    lag_pop();
 
-  glDisable(GL_FOG);
-  glDisable(GL_CULL_FACE);
+    WHAT("after rendering map");
 
-  glPushMatrix();
+    #if 0
+    char buffer[1048576];
+    char *pointer = buffer;
+    pointer += sprintf(pointer, "\e[H");
+    for (int y = chunk_dimension.y - 1; y >= 0; y--) {
+      for (int x = 0; x < chunk_dimension.x; x++) {
+        if (fudge[x][y]) {
+          pointer += sprintf(pointer, "[]");
+        } else {
+          pointer += sprintf(pointer, "  ");
+        };
+      };
+      pointer += sprintf(pointer, "\e[K\n");
+    };
+    int percent = round(100.0 * rendered_chunks / total_chunks);
+    pointer += sprintf(pointer, "Rendered %d%% of chunks.\e[K\n", percent);
+    pointer += sprintf(pointer, "map_perspective_angle = %0.1f.\e[K\n", map_perspective_angle);
+    printf("%s", buffer);
+    #endif
 
-  // Slightly back away from the scene, so that we can draw on top of it.
-  struct double_xyz v, t;
-  v.x = 1; v.y = 0; v.z = 0;
-  t.x = v.x * cos(player_view.v) - v.z * sin(player_view.v);
-  t.z = v.x * sin(player_view.v) + v.z * cos(player_view.v);
-  v.x = t.x; v.z = t.z;
-  t.x = v.x * cos(player_view.u) - v.y * sin(player_view.u);
-  t.y = v.x * sin(player_view.u) + v.y * cos(player_view.u);
-  v.x = t.x; v.y = t.y;
-  glTranslated(-1.0/64 * v.x, -1.0/64 * v.y, -1.0/64 * v.z);
+    glDisable(GL_FOG);
+    glDisable(GL_CULL_FACE);
 
-  draw_selection();
+    glPushMatrix();
 
-  draw_cursor();
+    // Slightly back away from the scene, so that we can draw on top of it.
+    struct double_xyz v, t;
+    v.x = 1; v.y = 0; v.z = 0;
+    t.x = v.x * cos(player_view.v) - v.z * sin(player_view.v);
+    t.z = v.x * sin(player_view.v) + v.z * cos(player_view.v);
+    v.x = t.x; v.z = t.z;
+    t.x = v.x * cos(player_view.u) - v.y * sin(player_view.u);
+    t.y = v.x * sin(player_view.u) + v.y * cos(player_view.u);
+    v.x = t.x; v.y = t.y;
+    glTranslated(-1.0/64 * v.x, -1.0/64 * v.y, -1.0/64 * v.z);
 
-  glPopMatrix();
+    draw_selection();
 
-  glDisable(GL_DEPTH_TEST);
+    draw_cursor();
 
-  #ifdef ANAGLYPH
+    glPopMatrix();
+
+    glDisable(GL_DEPTH_TEST);
 
   };
   glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-
-  #endif
 
 };
 
