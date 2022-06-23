@@ -86,10 +86,10 @@ GLuint texture_load (char *file, int size, int flags) {
 
     if (i) {
       for (int i = 0; i < 4 * x * y; i += 4) {
-        int v = (3.5 * data[i] + 4.5 * data[i + 1] + 2.0 * data[i + 2] + 5.0) / 10.0;
+        int v = (data[i + 0] + data[i + 1] + data[i + 2] + 0.5) / 3.0;
         if (v < 0) v = 0;
         if (v > 255) v = 255;
-        data[i] = v;
+        data[i + 0] = v;
         data[i + 1] = v;
         data[i + 2] = v;
       };
@@ -237,7 +237,7 @@ void texture_open_window() {
       };
     };
     glNewList(texture_list_base + i, GL_COMPILE);
-    glBindTexture(GL_TEXTURE_2D, texture_data[i].name);
+    glBindTexture(GL_TEXTURE_2D, texture_data[i].name + option_anaglyph_enable);
     glEndList();
   };
 };

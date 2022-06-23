@@ -69,8 +69,21 @@ void menus_anaglyph() {
   line++;
   line++;
                      // xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-  gui_text(-1, line++, "Measure as accurately as you can and include a decimal digit.");
-  gui_text(-1, line++, "If all measurements aren't correct, it won't work very well.");
+  //gui_text(-1, line++, "Measure as accurately as you can and include a decimal digit.");
+  //gui_text(-1, line++, "If all measurements aren't correct, it won't work very well.");
+  char *color[6] = {"red", "yellow", "green", "cyan", "blue", "magenta"};
+
+  for (int j = 0; j < 2; j++) {
+    int x = 18;
+    if (j == 0) gui_text(1, line, "Left color:");
+    if (j == 1) gui_text(1, line, "Right color:");
+    for (int i = 0; i < 6; i++) {
+      gui_radio(x, line, &option_anaglyph_filter[j], i, color[i]);
+      x += 5 + strlen(color[i]);
+    };
+    line++;
+  };
+
   line++;
   if (gui_check(4, line, &option_anaglyph_enable, 1, "Enable 3D Anaglyph Mode according to the above information.")) apply(), texture_reload();
 

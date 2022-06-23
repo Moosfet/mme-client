@@ -21,8 +21,10 @@ struct structure_render_list {
 
 double map_percentage_in_view = 0.0;
 double map_perspective_angle = 45.0;
+double map_crosshair_distance = 0.5;
 struct structure_map_data map_data = {};
 int map_chunk_bits = 5;
+int map_cursor_color = -1;
 
 #define map map_data
 #define chunk_bits map_chunk_bits
@@ -50,6 +52,7 @@ int map_chunk_bits = 5;
 //  0 - everything else
 
 int map_initialization_flag = 0;
+
 static struct int_xyz chunk_dimension = {};
 static int chunk_limit = 0;
 static int chunk_list_base = 0;
@@ -317,10 +320,10 @@ static void draw_selection() {
   for (int s = 0; s < 2; s++) {
 
     if (s == 0) {
-      glBindTexture(GL_TEXTURE_2D, texture_half_screen);
+      glBindTexture(GL_TEXTURE_2D, texture_half_screen + option_anaglyph_enable);
       glFrontFace(GL_CW);
     } else {
-      glBindTexture(GL_TEXTURE_2D, texture_full_screen);
+      glBindTexture(GL_TEXTURE_2D, texture_full_screen + option_anaglyph_enable);
       glFrontFace(GL_CCW);
     };
 
@@ -411,35 +414,48 @@ static void use_map_coordinates(int eye) {
 
   // Set window coordinates to map coordinates.
   glMatrixMode(GL_PROJECTION); glLoadIdentity();
-  gluPerspective(map_perspective_angle, display_window_height != 0 ? (float) display_window_width / display_window_height : display_window_width, 1.0/16, 4096);
-  glMatrixMode(GL_MODELVIEW); glLoadIdentity();
-  glRotated(-90, 1, 0, 0); glRotated(90, 0, 0, 1);
 
-  struct double_xyzuv pp = player_view;
-  if (map_data.wrap.x && pp.x >= map_data.dimension.x / 2) pp.x -= map_data.dimension.x;
-  if (map_data.wrap.y && pp.y >= map_data.dimension.y / 2) pp.y -= map_data.dimension.y;
-  if (map_data.wrap.z && pp.z >= map_data.dimension.z / 2) pp.z -= map_data.dimension.z;
-
-  double scale = 0.01;
-  if (option_anaglyph_units) scale /= 2.54;
-  double offset = 0.5 * scale * option_pupil_distance;
-  if (eye == 1) {
-    glRotated(atan2(+offset, scale * option_anaglyph_distance) * 180 / M_PI, 0, 0, +1);
-    glTranslated(0.0, -offset, 0.0);
-  } else if (eye == 2) {
-    glRotated(atan2(-offset, scale * option_anaglyph_distance) * 180 / M_PI, 0, 0, +1);
-    glTranslated(0.0, +offset, 0.0);
+  if (option_anaglyph_enable) {
+    // The window coordinates here, left to right, is -1.0 to +1.0
+    double scale = 0.01;
+    if (option_anaglyph_units) scale /= 2.54;
+    double pupil_offset = 0.5 * scale * option_pupil_distance;
+    double full_offset = 0.5 * scale * option_anaglyph_pixel_size * display_window_width;
+    double offset = pupil_offset / full_offset;
+    if (eye == 1) {
+      glTranslated(-offset, 0.0, 0.0);
+    } else if (eye == 2) {
+      glTranslated(+offset, 0.0, 0.0);
+    };
   };
 
+  gluPerspective(map_perspective_angle, display_window_height != 0 ? (float) display_window_width / display_window_height : display_window_width, 1.0/16, 4096);
+
+  glMatrixMode(GL_MODELVIEW); glLoadIdentity();
+
+  if (option_anaglyph_enable) {
+    // here we're in units of meters
+    double scale = 0.01;
+    if (option_anaglyph_units) scale /= 2.54;
+    double offset = 0.5 * scale * option_pupil_distance;
+    if (eye == 1) {
+      glTranslated(+offset, 0.0, 0.0);
+    } else if (eye == 2) {
+      glTranslated(-offset, 0.0, 0.0);
+    };
+  };
+
+  glRotated(-90, 1, 0, 0); glRotated(90, 0, 0, 1);
+
   // Rotate camera to player position...
-  glRotated(-(pp.v) * 180 / M_PI, 0, -1, 0);
-  glRotated(-(pp.u) * 180 / M_PI, 0, 0, +1);
+  glRotated(-(player_view.v) * 180 / M_PI, 0, -1, 0);
+  glRotated(-(player_view.u) * 180 / M_PI, 0, 0, +1);
 
   // Scale map so that one unit = one block.
   glScaled(map_data.resolution.x, map_data.resolution.y, map_data.resolution.z);
 
   // Move camera to player position...
-  glTranslated(-pp.x, -pp.y, -pp.z);
+  glTranslated(-player_view.x, -player_view.y, -player_view.z);
 
 };
 
@@ -630,6 +646,8 @@ void map_mouse_test() {
   // if (map_get_block_type(d) && block_data[map_get_block_type(d)].impassable) {
 
   double best_distance = 2 * reach + 1.0;
+
+  if (option_anaglyph_enable) best_distance = 4096;
 
   // expand search for auto-perspective's benefit
   //if (best_distance < 20) best_distance = 20;
@@ -837,6 +855,9 @@ void map_mouse_test() {
       distance = sqrt((point.x - player_view.x) * (point.x - player_view.x) + (point.y - player_view.y) * (point.y - player_view.y) + (point.z - player_view.z) * (point.z - player_view.z));
     };
   };
+
+  map_crosshair_distance = best_distance * map_data.resolution.x;
+  //printf("map_crosshair_distance = %f\n", map_crosshair_distance);
 
   #if 0
   // What does this do?  Adjust FOV based on distance of targeted block?
@@ -1933,52 +1954,34 @@ void *map_chunk_thread(void *parameter) {
 
 void map_render() {
 
-  if (option_fog_type == 1) {
-    glClearColor(0.6, option_anaglyph_enable ? 0 : 0.8, 1.0, 1.0);
-  } else {
-    if ((option_fog_type & 1) == 0) {
-      glClearColor(0.05, option_anaglyph_enable ? 0 : 0.05, 0.05, 1.0);
-    } else {
-      glClearColor(0.75, option_anaglyph_enable ? 0 : 0.8, 0.85, 1.0);
-    };
-  };
-
-  glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-  glClear(GL_COLOR_BUFFER_BIT);
-
-  WHAT("after clearing buffer");
-
   int do_anaglyph = option_anaglyph_enable && option_pupil_distance > 0.0;
 
-  static int toggle = 0;
-  toggle = !toggle;
+  if (do_anaglyph) {
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glClear(GL_COLOR_BUFFER_BIT);
+  };
 
   for (int eye = (do_anaglyph ? 1 : 0); eye < (do_anaglyph ? 3 : 1); eye++) {
-    if (eye == 0) glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    int r_mask = 1, g_mask = 1, b_mask = 1;
+    if (eye) {
+      r_mask = ((int []) {1, 1, 0, 0, 0, 1})[option_anaglyph_filter[eye - 1]];
+      g_mask = ((int []) {0, 1, 1, 1, 0, 0})[option_anaglyph_filter[eye - 1]];
+      b_mask = ((int []) {0, 0, 0, 1, 1, 1})[option_anaglyph_filter[eye - 1]];
+    };
 
-    //if (eye == 2) continue;
+    glColorMask(r_mask ? GL_TRUE : GL_FALSE, g_mask ? GL_TRUE : GL_FALSE, b_mask ? GL_TRUE : GL_FALSE, GL_TRUE);
 
-    // red purple, purple visible in both eyes
-    if (eye == 1) glColorMask(GL_TRUE, GL_TRUE, GL_FALSE, GL_TRUE);
-    if (eye == 2) glColorMask(GL_FALSE, GL_TRUE, GL_TRUE, GL_TRUE);
+    if (option_fog_type == 1) {
+      glClearColor(0.6 * r_mask, 0.8 * g_mask, 1.0 * b_mask, 1.0);
+    } else {
+      if ((option_fog_type & 1) == 0) {
+        glClearColor(0.05 * r_mask, 0.05 * g_mask, 0.05 * b_mask, 1.0);
+      } else {
+        glClearColor(0.75 * r_mask, 0.8 * g_mask, 0.85 * b_mask, 1.0);
+      };
+    };
 
-    // yellow purple, purple visible in both eyes
-    if (eye == 1) glColorMask(GL_TRUE, GL_TRUE, GL_FALSE, GL_TRUE);
-    if (eye == 2) glColorMask(GL_FALSE, GL_FALSE, GL_TRUE, GL_TRUE);
-
-    //if (!toggle) {
-      // red cyan, i guess this is the best one
-      if (eye == 1) glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE);
-      if (eye == 2) glColorMask(GL_FALSE, GL_TRUE, GL_TRUE, GL_TRUE);
-    //} else {
-      // yellow blue, filters well, but the yellow is not very dark
-      if (eye == 1) glColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_TRUE);
-      if (eye == 2) glColorMask(GL_FALSE, GL_FALSE, GL_TRUE, GL_TRUE);
-    //};
-
-    //if (eye < 2)
     glClear(GL_COLOR_BUFFER_BIT);
-
     glClear(GL_DEPTH_BUFFER_BIT);
     use_map_coordinates(eye);
 
@@ -2365,5 +2368,3 @@ void map_render() {
   glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 
 };
-
-int map_cursor_color = -1;

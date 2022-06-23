@@ -51,6 +51,7 @@ int option_window_location_x;
 int option_window_location_y;
 int option_anaglyph_units;
 double option_pupil_distance;
+int option_anaglyph_filter[2];
 
 // unsaved options:
 int option_f3_display = 0;
@@ -145,6 +146,8 @@ void option_load() {
   option_window_location_y = 0;
   option_anaglyph_units = 0;
   option_pupil_distance = 5.5;
+  option_anaglyph_filter[0] = 0;
+  option_anaglyph_filter[1] = 4;
 
   option_key_reset();
 
@@ -248,6 +251,8 @@ void option_load() {
     READ_WORD(option_window_location_y);
     READ_BYTE(option_anaglyph_units);
     READ_DOUBLE(option_pupil_distance);
+    READ_BYTE(option_anaglyph_filter[0]);
+    READ_BYTE(option_anaglyph_filter[1]);
 
     fclose(file);
 
@@ -363,6 +368,8 @@ void option_save() {
   WRITE_WORD(option_window_location_y);
   WRITE_BYTE(option_anaglyph_units);
   WRITE_DOUBLE(option_pupil_distance);
+  WRITE_BYTE(option_anaglyph_filter[0]);
+  WRITE_BYTE(option_anaglyph_filter[1]);
 
   #ifdef UNIX
   close(open("options.bin", O_CREAT, 0600));

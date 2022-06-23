@@ -206,6 +206,10 @@ void chat_color(int color) {
   double i = 0.5 + 0.5 * cos(2 * M_PI * (on_frame_time + c));
   double j = 0.5 + 0.5 * sin(2 * M_PI * (on_frame_time + c));
 
+  #define glColor4f(red, green, blue, alpha) { r = red; g = green; b = blue; a = alpha; }
+
+  double r, g, b, a;
+
   switch(color) {
 
     case 1: glColor4f(0.6, 0.3, 0.2, 1.0); break;
@@ -251,4 +255,13 @@ void chat_color(int color) {
     default: glColor4f(1.0, 1.0, 1.0, 1.0); break;
 
   };
+
+  if (option_anaglyph_enable) {
+    double v = (r + g + b) / 3.0;
+    r = g = b = v;
+  };
+
+  #undef glColor4f
+  glColor4f(r, g, b, a);
+
 };

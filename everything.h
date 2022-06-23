@@ -510,6 +510,7 @@ extern struct int_xyz map_selection_corner_two;
 extern struct int_xyz map_selection_dimensions;
 extern double map_perspective_angle;
 extern struct structure_map_selection map_selection;
+extern double map_crosshair_distance;
 
 void map_initialize();
 void map_open_window();
@@ -758,6 +759,7 @@ extern int option_window_location_x;
 extern int option_window_location_y;
 extern int option_anaglyph_units;
 extern double option_pupil_distance;
+extern int option_anaglyph_filter[2];
 
 void option_key_reset();
 void option_load();

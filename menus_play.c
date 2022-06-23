@@ -914,47 +914,69 @@ void menus_play() {
       gui_text(offset, y, instruction);
     };
 
-    #ifndef ANAGLYPH
     if (glfw_mouse_capture_flag) {
       glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
       glEnable(GL_LINE_SMOOTH);
       glEnable(GL_BLEND);
-      if (building_is_allowed) {
-        if (mode == 6) {
-          if (on_frame_time - projectile_last_stamp < 0.001) {chat_color (3);}
-          else chat_color(15);
-        } else {
-          glColor3f(1.0, 1.0, 1.0);
-        }
-        glLineWidth(1.5);
-        glBegin(GL_LINES);
-        glVertex2f(display_window_width / 2.0 - 12, display_window_height / 2.0);
-        glVertex2f(display_window_width / 2.0 + 12, display_window_height / 2.0);
-        glVertex2f(display_window_width / 2.0, display_window_height / 2.0 - 12);
-        glVertex2f(display_window_width / 2.0, display_window_height / 2.0 + 12);
-        glEnd();
-        if (mode == 4) {
+      for (int eye = (option_anaglyph_enable ? 1 : 0); eye < (option_anaglyph_enable ? 3 : 1); eye++) {
+        int r_mask = 1, g_mask = 1, b_mask = 1;
+        if (eye) {
+          r_mask = ((int []) {1, 1, 0, 0, 0, 1})[option_anaglyph_filter[eye - 1]];
+          g_mask = ((int []) {0, 1, 1, 1, 0, 0})[option_anaglyph_filter[eye - 1]];
+          b_mask = ((int []) {0, 0, 0, 1, 1, 1})[option_anaglyph_filter[eye - 1]];
+          double scale = 0.01;
+          if (option_anaglyph_units) scale /= 2.54;
+          double pupil_offset_meters = 0.5 * scale * option_pupil_distance;
+          double pupil_offset_pixels = pupil_offset_meters / (scale * option_anaglyph_pixel_size);
+          double offset = pupil_offset_pixels * (scale * option_anaglyph_distance) / map_crosshair_distance;
+          //printf("pom = %f, cdm = %f, sdm = %f, pop = %f, offset = %f\n", pupil_offset_meters, map_crosshair_distance, option_anaglyph_distance * scale, pupil_offset_pixels, offset);
           glPushMatrix();
-          chat_color(11);
-          glTranslated(display_window_width / 2.0 - 30 - gui_menu_x_offset, display_window_height / 2.0 - 48 - gui_menu_y_offset, 0);
-          gui_draw_text(0, 0, "PASTE", NULL, FLAGS);
-          glTranslated(6, 0, 0);
-          gui_draw_text(0, 3, "MODE", NULL, FLAGS);
-          glPopMatrix();
+          if (eye == 1) glTranslated(-pupil_offset_pixels + offset, 0, 0);
+          if (eye == 2) glTranslated(+pupil_offset_pixels - offset, 0, 0);
         };
-      } else {
-        glColor3f(1.0, 0.0, 0.0);
-        glLineWidth(1.5);
-        glBegin(GL_LINES);
-        glVertex2f(display_window_width / 2.0 - 12, display_window_height / 2.0 - 12);
-        glVertex2f(display_window_width / 2.0 + 12, display_window_height / 2.0 + 12);
-        glVertex2f(display_window_width / 2.0 - 12, display_window_height / 2.0 + 12);
-        glVertex2f(display_window_width / 2.0 + 12, display_window_height / 2.0 - 12);
-        glEnd();
+        glColorMask(r_mask ? GL_TRUE : GL_FALSE, g_mask ? GL_TRUE : GL_FALSE, b_mask ? GL_TRUE : GL_FALSE, GL_TRUE);
+        if (building_is_allowed) {
+          if (mode == 6) {
+            if (on_frame_time - projectile_last_stamp < 0.001) {
+              chat_color(3);
+            } else {
+              chat_color(15);
+            };
+          } else {
+            glColor3f(1.0, 1.0, 1.0);
+          };
+          glLineWidth(1.5);
+          glBegin(GL_LINES);
+          glVertex2f(display_window_width / 2.0 - 12, display_window_height / 2.0);
+          glVertex2f(display_window_width / 2.0 + 12, display_window_height / 2.0);
+          glVertex2f(display_window_width / 2.0, display_window_height / 2.0 - 12);
+          glVertex2f(display_window_width / 2.0, display_window_height / 2.0 + 12);
+          glEnd();
+          if (mode == 4) {
+            glPushMatrix();
+            chat_color(11);
+            glTranslated(display_window_width / 2.0 - 30 - gui_menu_x_offset, display_window_height / 2.0 - 48 - gui_menu_y_offset, 0);
+            gui_draw_text(0, 0, "PASTE", NULL, FLAGS);
+            glTranslated(6, 0, 0);
+            gui_draw_text(0, 3, "MODE", NULL, FLAGS);
+            glPopMatrix();
+          };
+        } else {
+          glColor3f(1.0, 0.2, 0.1);
+          glLineWidth(1.5);
+          glBegin(GL_LINES);
+          glVertex2f(display_window_width / 2.0 - 12, display_window_height / 2.0 - 12);
+          glVertex2f(display_window_width / 2.0 + 12, display_window_height / 2.0 + 12);
+          glVertex2f(display_window_width / 2.0 - 12, display_window_height / 2.0 + 12);
+          glVertex2f(display_window_width / 2.0 + 12, display_window_height / 2.0 - 12);
+          glEnd();
+        };
+        if (eye) glPopMatrix();
       };
       glDisable(GL_BLEND);
     };
-    #endif
+
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 
     // The "server may no longer be connected" warning...
 

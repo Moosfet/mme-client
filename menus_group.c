@@ -199,7 +199,7 @@ void menus_group() {
               glEnable(GL_ALPHA_TEST);
               glAlphaFunc(GL_GEQUAL, texture_data[block_data[type].index[BLOCK_SIDE_UP]].alpha);
             };
-            glBindTexture(GL_TEXTURE_2D, texture_data[block_data[type].index[BLOCK_SIDE_UP]].name);
+            glBindTexture(GL_TEXTURE_2D, texture_data[block_data[type].index[BLOCK_SIDE_UP]].name + option_anaglyph_enable);
             glBegin(GL_QUADS);
             glTexCoord2f(TC1, TC1);
             glVertex2f(X0, Y0);
@@ -223,7 +223,7 @@ void menus_group() {
               glAlphaFunc(GL_GEQUAL, texture_data[block_data[type].index[BLOCK_SIDE_UP]].alpha);
             };
             glColor3f(0.8, 0.8, 0.8);
-            glBindTexture(GL_TEXTURE_2D, texture_data[block_data[type].index[BLOCK_SIDE_FRONT]].name);
+            glBindTexture(GL_TEXTURE_2D, texture_data[block_data[type].index[BLOCK_SIDE_FRONT]].name + option_anaglyph_enable);
             glBegin(GL_QUADS);
             glTexCoord2f(TC0, TC0);
             glVertex2f(X4, Y4);
@@ -247,7 +247,7 @@ void menus_group() {
               glAlphaFunc(GL_GEQUAL, texture_data[block_data[type].index[BLOCK_SIDE_RIGHT]].alpha);
             };
             glColor3f(0.6, 0.6, 0.6);
-            glBindTexture(GL_TEXTURE_2D, texture_data[block_data[type].index[BLOCK_SIDE_RIGHT]].name);
+            glBindTexture(GL_TEXTURE_2D, texture_data[block_data[type].index[BLOCK_SIDE_RIGHT]].name + option_anaglyph_enable);
             glBegin(GL_QUADS);
             glTexCoord2f(TC1, TC0);
             glVertex2f(X5, Y5);
