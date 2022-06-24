@@ -3,7 +3,7 @@
 // This little area is just to define what I want to syntax check while
 // editing the source code in my text editor.
 
-#ifndef WIN32
+#ifndef WINDOWS
   #ifndef LINUX
     #ifndef FREEBSD
       #ifndef UNIX
@@ -573,6 +573,8 @@ extern int menu_process_event;
 extern int menu_current_event;
 extern int menu_draw_widget;
 extern int menu_modifier_shift;
+extern int menu_modifier_control;
+extern int menu_modifier_alt;
 extern int menu_display_data;
 
 void menu_switch(void (*menu)());

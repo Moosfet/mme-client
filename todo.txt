@@ -1,9 +1,5 @@
 short-term:
 
-  generate a build.c
-  fix fullscreen
-  fix save & restore of window position
-  vsync toggle shouldn't require a new window
   anisotropic filtering and antialiasing settings
   remove F G H special actions
 

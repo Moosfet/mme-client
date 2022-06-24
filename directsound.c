@@ -1,6 +1,6 @@
 #include "everything.h"
 
-#ifdef WIN32
+#ifdef WINDOWS
 
 #include <dsound.h>
 
@@ -25,7 +25,7 @@ static unsigned long period_size = 0;  // set to buffer_size / 4 in code below..
 
 //--page-split-- directsound_error
 
-#ifdef WIN32
+#ifdef WINDOWS
 
 static void directsound_error (char *function, const char *message) {
   fprintf(stderr, "DirectSound Error: %s: %s\n", function, message);
@@ -42,7 +42,7 @@ static volatile int thread_exit_flag = 0;   // used to tell thread to exit
 
 //--page-split-- directsound_strerror
 
-#ifdef WIN32
+#ifdef WINDOWS
 
 static char * directsound_strerror(int ret) {
   char *error_pointer = "undefined windows error";
@@ -74,7 +74,7 @@ static char * directsound_strerror(int ret) {
 
 //--page-split-- directsound_initialize
 
-#ifdef WIN32
+#ifdef WINDOWS
 
 void directsound_initialize() {
 
@@ -148,7 +148,7 @@ void directsound_initialize() {
 
 //--page-split-- directsound_terminate
 
-#ifdef WIN32
+#ifdef WINDOWS
 
 void directsound_terminate() {
 
@@ -164,7 +164,7 @@ void directsound_terminate() {
 
 //--page-split-- directsound_output_thread
 
-#ifdef WIN32
+#ifdef WINDOWS
 
 static void *directsound_output_thread(void *argument) {
 

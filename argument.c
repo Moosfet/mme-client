@@ -39,7 +39,6 @@ static void argument_parse (int argc, char **argv) {
     else if (strcmp(argv[i], "--modes") == 0) argument_modes = 1;
     // Why does this exist?  We can just press F11 after it starts up.
     //else if (strcmp(argv[i], "--fullscreen") == 0) argument_fullscreen = 1;
-    #ifndef TEST_SERVER_ONLY
     else if (strcmp(argv[i], "--server") == 0) {
       if (i + 1 < argc) {
         char *server = argv[++i];
@@ -77,19 +76,12 @@ static void argument_parse (int argc, char **argv) {
         printf("Option --server requires an argument.\n");
         exit(1);
       };
-    }
-    #endif
-    else {
+    } else {
       printf("\nUnrecognized option '%s'\n", argv[i]);
       help();
     };
   };
-  #ifdef WIN32
-  if ( argument_packets || argument_modes ) {
-//    AllocConsole();
-  }
-  #endif
-}
+};
 
 //--page-split-- argument_check
 

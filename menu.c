@@ -4,6 +4,27 @@ void (*menu_function_pointer)() = menus_server_connect;
 
 static int menu_switch_occured;
 
+int menu_object_data[MENU_MAX_OBJECTS][16];
+int menu_object_index;
+int menu_focus_object = 0;
+int menu_next_focus;
+
+int menu_process_event;
+int menu_current_event;
+int menu_draw_widget;
+
+int menu_modifier_shift;
+int menu_modifier_control;
+int menu_modifier_alt;
+static int left_shift = 0;
+static int right_shift = 0;
+static int left_control = 0;
+static int right_control = 0;
+static int left_alt = 0;
+static int right_alt = 0;
+
+int menu_display_data = 0;
+
 //--page-split-- menu_switch
 
 void menu_switch(void (*menu)()) {
@@ -22,19 +43,6 @@ void menu_switch(void (*menu)()) {
   menu_focus_object = -1;
 };
 
-int menu_object_data[MENU_MAX_OBJECTS][16];
-int menu_object_index;
-int menu_focus_object = 0;
-int menu_next_focus;
-
-int menu_process_event;
-int menu_current_event;
-int menu_draw_widget;
-
-int menu_modifier_shift;
-static int left_shift = 0;
-static int right_shift = 0;
-
 //--page-split-- menu_process
 
 void menu_process() {
@@ -51,6 +59,22 @@ void menu_process() {
       if (KEY == GLFW_KEY_RIGHT_SHIFT) right_shift = 0;
     };
     menu_modifier_shift = left_shift | right_shift;
+    if (KEY_PRESS_EVENT) {
+      if (KEY == GLFW_KEY_LEFT_CONTROL) left_control = 1;
+      if (KEY == GLFW_KEY_RIGHT_CONTROL) right_control = 1;
+    } else if (KEY_RELEASE_EVENT) {
+      if (KEY == GLFW_KEY_LEFT_CONTROL) left_control = 0;
+      if (KEY == GLFW_KEY_RIGHT_CONTROL) right_control = 0;
+    };
+    menu_modifier_control = left_control | right_control;
+    if (KEY_PRESS_EVENT) {
+      if (KEY == GLFW_KEY_LEFT_ALT) left_alt = 1;
+      if (KEY == GLFW_KEY_RIGHT_ALT) right_alt = 1;
+    } else if (KEY_RELEASE_EVENT) {
+      if (KEY == GLFW_KEY_LEFT_ALT) left_alt = 0;
+      if (KEY == GLFW_KEY_RIGHT_ALT) right_alt = 0;
+    };
+    menu_modifier_alt = left_alt | right_alt;
 
     if (KEY_PRESS_EVENT && !menus_controls_disable_function_keys) {
       if (KEY == GLFW_KEY_F1) menu_switch(menus_help);
@@ -86,8 +110,6 @@ void menu_process() {
   };
   event_list_index = 0;
 };
-
-int menu_display_data = 0;
 
 //--page-split-- f3_display
 

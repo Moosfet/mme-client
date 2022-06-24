@@ -846,49 +846,43 @@ int gui_input(int x, int y, int size, int length, char *string, int flags) {
         if (KEY == GLFW_KEY_ESCAPE) {
           menu_next_focus = 0;
         };
-        if (KEY == GLFW_KEY_INSERT && menu_modifier_shift) {
+        if ((KEY == GLFW_KEY_INSERT && menu_modifier_shift) || (KEY == GLFW_KEY_V && menu_modifier_control)) {
           char *clipboard = NULL;
-          #if 0
-            // GLFW 3 has better copy/paste stuff so I've disabled this.
-            // I'll rewrite it to use the better stuff later.
-            HANDLE glfwGetWindowHandle();
-            HANDLE window = glfwGetWindowHandle();
-            OpenClipboard(window);
-            HANDLE handle;
-            // The clipboard contents end with a null character,
-            // but pretending as if they don't handles null data.
-            if ((handle = GetClipboardData(CF_UNICODETEXT))) {
-              int s = GlobalSize(handle);
-              unsigned short *unicode = GlobalLock(handle);
-              memory_allocate(&clipboard, s / 2 + 1);
-              char *p = clipboard;
-              for (int i = 0; i < s / 2; i++) {
-                int c = event_translate_from_unicode(unicode[i]);
-                if (c) *p++ = c;
-              }; *p = 0;
-              GlobalUnlock(handle);
-            } else if ((handle = GetClipboardData(CF_TEXT))) {
-              int s = GlobalSize(handle);
-              char *ascii = GlobalLock(handle);
-              memory_allocate(&clipboard, s + 1);
-              memmove(clipboard, ascii, s);
-              clipboard[s] = 0;
-              GlobalUnlock(handle);
+          char *text = (char *) glfwGetClipboardString(NULL);
+          if (text) {
+            char *p = text;
+            memory_allocate(&clipboard, strlen(text) + 1);
+            char *output = clipboard;
+            while (*p) {
+              int codepoint, count;
+              if ((*p & 0x80) == 0x00) { count = 0; codepoint = *p & 0x7F; };
+              if ((*p & 0xC0) == 0x80) break; // invalid
+              if ((*p & 0xE0) == 0xC0) { count = 1; codepoint = *p & 0x1F; };
+              if ((*p & 0xF0) == 0xE0) { count = 2; codepoint = *p & 0x0F; };
+              if ((*p & 0xF8) == 0xF0) { count = 3; codepoint = *p & 0x07; };
+              if ((*p & 0xF8) == 0xF0) break; // invalid
+              for (int i = 1; i <= count; i++) {
+                if (!p[i] || (p[i] & 0xC0) != 0x80) break;
+                codepoint <<= 6;
+                codepoint |= p[i] & 0x3F;
+              };
+              *output = event_translate_from_unicode(codepoint);
+              if (*output) output++;
+              p += count + 1;
             };
-            CloseClipboard();
-          #endif
-          #ifdef UNIX
-            printf("I don't know how to paste in X11.\n");
-          #endif
-          if (clipboard != NULL) {
-            int l = strlen(clipboard);
-            for (int i = 0; i < l; i++) {
-              if (current < length) {
-                memmove(string + cursor + 1, string + cursor, length - cursor);
-                string[cursor] = clipboard[i];
-                cursor++;
-                change = 1;
-                current++;
+            if (*p) {
+              fprintf(stderr, "Invalid Unicode received from clipboard.\n");
+            } else {
+              *output = 0;
+              int l = output - clipboard;
+              for (int i = 0; i < l; i++) {
+                if (current < length) {
+                  memmove(string + cursor + 1, string + cursor, length - cursor);
+                  string[cursor] = clipboard[i];
+                  cursor++;
+                  change = 1;
+                  current++;
+                };
               };
             };
             memory_allocate(&clipboard, 0);

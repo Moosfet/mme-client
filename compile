@@ -55,7 +55,7 @@ for i in $@; do
   if [ $i == WINDOWS ]; then
     echo "char build_target[] = \"Windows\";" >> build.c
     # -lwinmm used to be in the link libraries but doesn't seem to be needed
-    COMPILE_OPTIONS="-DWIN32 $COMPILE_OPTIONS";
+    COMPILE_OPTIONS="$COMPILE_OPTIONS";
     LINK_LIBRARIES="static/libz.a static/libglfw3.a $LINK_LIBRARIES -lgdi32 -lopengl32 -lglu32 -lwsock32 -lws2_32 -lole32 -ldsound"
     LINK_OPTIONS="-static $LINK_OPTIONS"
     COMPILER="x86_64-w64-mingw32-gcc"
