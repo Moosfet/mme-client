@@ -179,9 +179,6 @@ void menus_play() {
             message_no_gun = on_frame_time + 3;
         }
       }
-      if (CHARACTER == 'F' || CHARACTER == 'f') menu_switch(menus_fog);
-      if (CHARACTER == 'G' || CHARACTER == 'g') menu_switch(menus_graphics);
-      if (CHARACTER == 'H' || CHARACTER == 'h') menu_switch(menus_help);
     };
     if (KEY_PRESS_EVENT) {
       if (KEY == option_key_input[CONTROLS_KEY_CHAT][0]) saw_chat_menu_key_press[0] = 1;
@@ -762,7 +759,7 @@ void menus_play() {
       //} else {
       //  chat_color(13);
       //};
-      gui_text(0, 0, "\e\x0B" "Press H for help!");
+      gui_text(0, 0, "\e\x0B" "Press F1 for help!");
     };
 
     // Copy & Paste Instructions

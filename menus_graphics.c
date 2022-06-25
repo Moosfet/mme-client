@@ -42,11 +42,9 @@ void menus_graphics() {
 
   gui_check(4, 13, &option_blender_font, 1, "Use a smoother but somewhat harder to read font.");
 
-  gui_text(1, 15, "\e\x0B**\e\x09 Changing options below this point will trigger a");
-  gui_text(1, 16, "\e\x0B**\e\x09 graphics restart which requires about 10 seconds.");
-
-  if (gui_check(4, 18, &option_fsaa_samples, 1, "Antialiasing (higher quality, lower FPS)")) main_restart();
-
-  if (gui_check(4, 19, &option_anisotropic_filtering, 1, "Anisotropic Filtering (higher quality, lower FPS)")) main_restart();
+  if (gui_check(4, 15, &option_fsaa_samples, 1, "Antialiasing (higher quality, lower FPS)")) {
+    glfw_close_window();
+    glfw_open_window();
+  };
 
 };

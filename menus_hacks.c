@@ -157,10 +157,10 @@ void menus_hacks() {
 //    map_begin_render();
 //  };
 
-  if (gui_check(4, 3, &option_optimize_chunks, 1, "Optimize Chunks")) {
-    map_cease_render();
-    map_begin_render();
-  };
+//  if (gui_check(4, 3, &option_optimize_chunks, 1, "Optimize Chunks")) {
+//    map_cease_render();
+//    map_begin_render();
+//  };
 
   #ifdef TEST
   if (argument_lag == 0 && on_activate_lag == 0) {

@@ -13,7 +13,6 @@ int option_fps_goal;
 int option_fog_type;
 int option_fog_distance;
 int option_mouse_invert;
-int option_mouse_reverse_unused;
 int option_perspective_angle;
 int option_anaglyph_enable;
 int option_show_f1_help;
@@ -56,12 +55,14 @@ int option_anaglyph_filter[2];
 // unsaved options:
 int option_f3_display = 0;
 int option_anaglyph = 0;
+int option_fullscreen = 0;
 
 #define OPTION_SIZE 4096
 
 //--page-split-- option_key_reset
 
 void option_key_reset() {
+  memset(option_key_input, 0, sizeof(option_key_input));
   option_key_input[CONTROLS_KEY_FORWARD][0] = 'W';
   option_key_input[CONTROLS_KEY_FORWARD][1] = GLFW_KEY_UP;
   option_key_input[CONTROLS_KEY_BACK][0] = 'S';
@@ -72,32 +73,24 @@ void option_key_reset() {
   option_key_input[CONTROLS_KEY_RIGHT][1] = GLFW_KEY_RIGHT;
   option_key_input[CONTROLS_KEY_RUN][0] = GLFW_KEY_LEFT_SHIFT;
   option_key_input[CONTROLS_KEY_RUN][1] = GLFW_KEY_RIGHT_SHIFT;
-  option_key_input[CONTROLS_KEY_JUMP][0] = ' ';
-  option_key_input[CONTROLS_KEY_JUMP][1] = 0;
+  option_key_input[CONTROLS_KEY_JUMP][0] = GLFW_KEY_SPACE;
   option_key_input[CONTROLS_KEY_CHAT][0] = GLFW_KEY_ENTER;
   option_key_input[CONTROLS_KEY_CHAT][1] = 'T';
   option_key_input[CONTROLS_KEY_BLOCK_MENU][0] = 'B';
-  option_key_input[CONTROLS_KEY_BLOCK_MENU][1] = 0;
   option_key_input[CONTROLS_KEY_SERVER_MENU][0] = GLFW_KEY_TAB;
-  option_key_input[CONTROLS_KEY_SERVER_MENU][1] = GLFW_KEY_F2;
   option_key_input[CONTROLS_KEY_FLY_UP][0] = 'Q';
   option_key_input[CONTROLS_KEY_FLY_UP][1] = GLFW_KEY_HOME;
   option_key_input[CONTROLS_KEY_FLY_DOWN][0] = 'E';
   option_key_input[CONTROLS_KEY_FLY_DOWN][1] = GLFW_KEY_END;
   option_key_input[CONTROLS_KEY_MODE_FLY][0] = 'Z';
-  option_key_input[CONTROLS_KEY_MODE_FLY][1] = 0;
   option_key_input[CONTROLS_KEY_MODE_NOCLIP][0] = 'X';
-  option_key_input[CONTROLS_KEY_MODE_NOCLIP][1] = 0;
   option_key_input[CONTROLS_KEY_BLOCK_CREATE][0] = CONTROLS_MOUSE_KEY_LEFT;
-  option_key_input[CONTROLS_KEY_BLOCK_CREATE][1] = 0;
   option_key_input[CONTROLS_KEY_BLOCK_DESTROY][0] = CONTROLS_MOUSE_KEY_RIGHT;
-  option_key_input[CONTROLS_KEY_BLOCK_DESTROY][1] = 0;
   option_key_input[CONTROLS_KEY_BLOCK_CLONE][0] = CONTROLS_MOUSE_KEY_MIDDLE;
-  option_key_input[CONTROLS_KEY_BLOCK_CLONE][1] = 0;
-  option_key_input[CONTROLS_KEY_SNEAK][0] = 0;
-  option_key_input[CONTROLS_KEY_SNEAK][1] = 0;
-  option_key_input[CONTROLS_KEY_BLOCK_REPLACE][0] = 0;
-  option_key_input[CONTROLS_KEY_BLOCK_REPLACE][1] = 0;
+  option_key_input[CONTROLS_KEY_MODE_CUBOID][0] = GLFW_KEY_2;
+  option_key_input[CONTROLS_KEY_MODE_COPY][0] = GLFW_KEY_3;
+  option_key_input[CONTROLS_KEY_MODE_PASTE][0] = GLFW_KEY_4;
+  option_key_input[CONTROLS_KEY_MODE_THROW][0] = GLFW_KEY_6;
 }
 
 //--page-split-- option_load
@@ -107,7 +100,6 @@ void option_load() {
   option_fps_limit = 60;
   option_fps_goal = 20;
   option_mouse_invert = 0;
-  option_mouse_reverse_unused = 0;
   option_fog_type = 1;
   option_fog_distance = 256;
   option_perspective_angle = 90;
@@ -127,7 +119,7 @@ void option_load() {
   option_remember_size = 0;
   option_fsaa_samples = 0;
   option_multiple_paste = 0;
-  option_custom_fps = 100;
+  option_custom_fps = 144;
   option_hyper_help = 1;
   memset(option_cookie_data, 0, 20);
   option_have_cookie = 0;
@@ -138,8 +130,8 @@ void option_load() {
   option_textures = 1;
   option_advertise = 1;
   option_sound = 1;
-  option_hud_display = 1;
-  option_superhuman = 1;
+  option_hud_display = 0;
+  option_superhuman = 0;
   option_volume = 1.0f;
   option_anisotropic_filtering = 0;
   option_window_location_x = 0;
@@ -148,6 +140,7 @@ void option_load() {
   option_pupil_distance = 5.5;
   option_anaglyph_filter[0] = 0;
   option_anaglyph_filter[1] = 4;
+  option_fullscreen = 0;
 
   option_key_reset();
 
@@ -171,7 +164,7 @@ void option_load() {
     READ_BYTE(option_fps_limit);
     READ_BYTE(option_fps_goal);
     READ_BYTE(option_mouse_invert);
-    READ_BYTE(option_mouse_reverse_unused);
+    file_offset += 1; // option_mouse_reverse
     READ_WORD(option_fog_type);
     READ_WORD(option_fog_distance);
     READ_BYTE(option_perspective_angle);
@@ -196,7 +189,6 @@ void option_load() {
     READ_BYTE(option_hyper_help);
     if (file_limit >= file_offset + 20) {
       memmove(option_cookie_data, &BYTE(file_offset), 20);
-      fprintf(stderr, "loaded cookie data from options file\n");
       file_offset += 20;
     } else goto DONE;
     READ_BYTE(option_have_cookie);
@@ -253,6 +245,14 @@ void option_load() {
     READ_DOUBLE(option_pupil_distance);
     READ_BYTE(option_anaglyph_filter[0]);
     READ_BYTE(option_anaglyph_filter[1]);
+    READ_UINT(option_key_input[CONTROLS_KEY_MODE_CUBOID][0]);
+    READ_UINT(option_key_input[CONTROLS_KEY_MODE_CUBOID][1]);
+    READ_UINT(option_key_input[CONTROLS_KEY_MODE_COPY][0]);
+    READ_UINT(option_key_input[CONTROLS_KEY_MODE_COPY][1]);
+    READ_UINT(option_key_input[CONTROLS_KEY_MODE_PASTE][0]);
+    READ_UINT(option_key_input[CONTROLS_KEY_MODE_PASTE][1]);
+    READ_UINT(option_key_input[CONTROLS_KEY_MODE_THROW][0]);
+    READ_UINT(option_key_input[CONTROLS_KEY_MODE_THROW][1]);
 
     fclose(file);
 
@@ -292,7 +292,7 @@ void option_save() {
   WRITE_BYTE(option_fps_limit);
   WRITE_BYTE(option_fps_goal);
   WRITE_BYTE(option_mouse_invert);
-  WRITE_BYTE(option_mouse_reverse_unused);
+  file_offset += 1; // option_mouse_reverse
   WRITE_WORD(option_fog_type);
   WRITE_WORD(option_fog_distance);
   WRITE_BYTE(option_perspective_angle);
@@ -370,6 +370,14 @@ void option_save() {
   WRITE_DOUBLE(option_pupil_distance);
   WRITE_BYTE(option_anaglyph_filter[0]);
   WRITE_BYTE(option_anaglyph_filter[1]);
+  WRITE_UINT(option_key_input[CONTROLS_KEY_MODE_CUBOID][0]);
+  WRITE_UINT(option_key_input[CONTROLS_KEY_MODE_CUBOID][1]);
+  WRITE_UINT(option_key_input[CONTROLS_KEY_MODE_COPY][0]);
+  WRITE_UINT(option_key_input[CONTROLS_KEY_MODE_COPY][1]);
+  WRITE_UINT(option_key_input[CONTROLS_KEY_MODE_PASTE][0]);
+  WRITE_UINT(option_key_input[CONTROLS_KEY_MODE_PASTE][1]);
+  WRITE_UINT(option_key_input[CONTROLS_KEY_MODE_THROW][0]);
+  WRITE_UINT(option_key_input[CONTROLS_KEY_MODE_THROW][1]);
 
   #ifdef UNIX
   close(open("options.bin", O_CREAT, 0600));

@@ -58,6 +58,8 @@ void menus_controls() {
 
   gui_check(4, 12, &option_multiple_paste, 1, "Multiple Pasting");
 
+  gui_check(4, 14, &option_superhuman, 1, "Superhuman Abilities");
+
   key_change_link(29, 2, "Place Block", CONTROLS_KEY_BLOCK_CREATE);
   key_change_link(29, 3, "Destory Block", CONTROLS_KEY_BLOCK_DESTROY);
   key_change_link(29, 4, "Clone Block", CONTROLS_KEY_BLOCK_CLONE);

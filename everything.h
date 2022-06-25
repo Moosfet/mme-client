@@ -143,7 +143,7 @@ struct int_xyzs {
 
 #define WHAT display_check_opengl_error
 
-#ifdef TEST
+#ifdef SAY_LOTSA_SHIT
   #define DEBUG(message) fprintf(stderr, "DEBUG: %s\n", message)
   #define lag_push(limit, message) { printf("%s:%d: lag_push(\"%s\")\n", __FILE__, __LINE__, message); lag__push(limit, message); }
   #define lag_pop() { printf("%s:%d: lag_pop()\n", __FILE__, __LINE__); lag__pop(); }
@@ -259,6 +259,10 @@ int controls_menu_released (int key_id);
 #define CONTROLS_KEY_SNEAK 16
 #define CONTROLS_KEY_BLOCK_REPLACE 17
 #define CONTROLS_KEY_COUNT 18
+#define CONTROLS_KEY_MODE_CUBOID 19
+#define CONTROLS_KEY_MODE_COPY 20
+#define CONTROLS_KEY_MODE_PASTE 21
+#define CONTROLS_KEY_MODE_THROW 22
 #define CONTROLS_KEY_LIMIT 64
 
 // these are used as fake key codes for the mouse events
@@ -722,7 +726,6 @@ extern int option_fps_goal;
 extern int option_fog_type;
 extern int option_fog_distance;
 extern int option_mouse_invert;
-extern int option_mouse_reverse_unused;
 extern int option_perspective_angle;
 extern int option_anaglyph_enable;
 extern int option_show_f1_help;
@@ -733,7 +736,6 @@ extern int option_request_vertical_sync;
 extern int option_noclip;
 extern int option_chat_return;
 extern int option_chat_clear;
-extern int option_optimize_chunks;
 extern int option_window_width;
 extern int option_window_height;
 extern int option_window_location;
@@ -762,6 +764,7 @@ extern int option_window_location_y;
 extern int option_anaglyph_units;
 extern double option_pupil_distance;
 extern int option_anaglyph_filter[2];
+extern int option_fullscreen;
 
 void option_key_reset();
 void option_load();
@@ -974,7 +977,7 @@ GLuint texture_load(char *file, int size, int flags);
 void texture_initialize();
 void texture_open_window();
 void texture_close_window();
-void texture_reload();
+void texture_rebind();
 void texture_reset();
 
 // thread.h

@@ -106,26 +106,23 @@ GLuint texture_load (char *file, int size, int flags) {
       #define GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT 0x84FF
     #endif
 
-    if (option_anisotropic_filtering) {
-      float max = 0.0f;
-      glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max);
-      if (max > 4.0f) {
-        max = 4.0f;
-      };
-      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max);
-    };
-
     if (flags & TEXTURE_FLAG_PIXELATE) {
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     } else {
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     };
     if (flags & TEXTURE_FLAG_MIPMAP) {
+      if (0) { // option_anisotropic_filtering
+        float max = 1.0f;
+        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max);
+      };
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
       lag_push(1000, "generating mipmaps");
       gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, x, y, GL_RGBA, GL_UNSIGNED_BYTE, data);
       lag_pop();
     } else {
+      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 0.0);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     };
@@ -255,9 +252,9 @@ void texture_close_window() {
   glDeleteLists(texture_list_base, TEXTURE_MAX_TEXTURES);
 };
 
-//--page-split-- texture_reload
+//--page-split-- texture_rebind
 
-void texture_reload () {
+void texture_rebind () {
   for (int i = 0; i < TEXTURE_MAX_TEXTURES; i++) {
     glNewList(texture_list_base + i, GL_COMPILE);
     glBindTexture(GL_TEXTURE_2D, texture_data[i].name + option_anaglyph_enable);

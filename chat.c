@@ -212,35 +212,18 @@ void chat_color(int color) {
 
   switch(color) {
 
-    case 1: glColor4f(0.6, 0.3, 0.2, 1.0); break;
-    case 2: glColor4f(1.0, 0.2, 0.2, 1.0); break;
-    case 3: glColor4f(1.0, 0.5, 0.2, 1.0); break;
-    case 4: glColor4f(1.0, 1.0, 0.2, 1.0); break;
-    case 5: glColor4f(0.2, 1.0, 0.2, 1.0); break;
-    case 6: glColor4f(0.2, 0.6, 1.0, 1.0); break;
-    case 7: glColor4f(0.6, 0.2, 1.0, 1.0); break;
-    case 8: glColor4f(0.55, 0.55, 0.7, 1.0); break;
-    case 9: glColor4f(1.0, 1.0, 1.0, 1.0); break;
-    case 10: glColor4f(0.2, 0.2, 0.2, 1.0); break;
-    case 12: glColor4f(1.0, 0.2, 0.6, 1.0); break;
+    case 1: glColor4f(0.6, 0.3, 0.2, 1.0); break; // brown
+    case 2: glColor4f(1.0, 0.2, 0.2, 1.0); break; // red
+    case 3: glColor4f(1.0, 0.5, 0.2, 1.0); break; // orange
+    case 4: glColor4f(1.0, 1.0, 0.2, 1.0); break; // yellow
+    case 5: glColor4f(0.2, 1.0, 0.2, 1.0); break; // green
+    case 6: glColor4f(0.2, 0.6, 1.0, 1.0); break; // blue
+    case 7: glColor4f(0.6, 0.2, 1.0, 1.0); break; // purple
+    case 8: glColor4f(0.55, 0.55, 0.7, 1.0); break; // gray
+    case 9: glColor4f(1.0, 1.0, 1.0, 1.0); break; // white
+    case 10: glColor4f(0.2, 0.2, 0.2, 1.0); break; // black
 
-    case 13: {
-      glColor4f(0.85 + 0.15 * i, 0.9 + 0.1 * i, 0.95 + 0.05 * j, 1.0);
-    }; break;
-
-    case 14: {
-      glColor4f(1.0, 0.85 + 0.15 * i, 0.2 * j, 1.0);
-    }; break;
-
-    case 15: {
-      glColor4f(0.9 + 0.1 * j, 0.1 + 0.1 * i, 0.2 + 0.1 * j, 1.0);
-    }; break;
-
-    case 16: {
-      glColor4f(0.1 + 0.1 * i, 0.9 + 0.1 * j, 0.2 + 0.1 * j, 1.0);
-    }; break;
-
-    case 11: {
+    case 11: { // rainbow
       float r, g, b;
       float a = 4 * fmod(on_frame_time, 1.0);
       if (a < 1) r = 1, g = a, b = 0;
@@ -250,6 +233,24 @@ void chat_color(int color) {
       else if (a < 3.5) r = 2 * (a - 3), g = 0, b = 1;
       else r = 1, g = 0, b = 2 * (4 - a);
       glColor4f(r, g, b, 1.0);
+    }; break;
+
+    case 12: glColor4f(1.0, 0.2, 0.6, 1.0); break; // magenta
+
+    case 13: { // silver
+      glColor4f(0.85 + 0.15 * i, 0.9 + 0.1 * i, 0.95 + 0.05 * j, 1.0);
+    }; break;
+
+    case 14: { // gold
+      glColor4f(1.0, 0.85 + 0.15 * i, 0.2 * j, 1.0);
+    }; break;
+
+    case 15: { // ruby
+      glColor4f(0.9 + 0.1 * j, 0.1 + 0.1 * i, 0.2 + 0.1 * j, 1.0);
+    }; break;
+
+    case 16: { // emerald
+      glColor4f(0.1 + 0.1 * i, 0.9 + 0.1 * j, 0.2 + 0.1 * j, 1.0);
     }; break;
 
     default: glColor4f(1.0, 1.0, 1.0, 1.0); break;

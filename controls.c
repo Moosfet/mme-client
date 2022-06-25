@@ -1,9 +1,10 @@
 #include "everything.h"
 
 static const int invalids[] = {
-  GLFW_KEY_ESCAPE, GLFW_KEY_F1, GLFW_KEY_F3, GLFW_KEY_F4, GLFW_KEY_F10, GLFW_KEY_F11, GLFW_KEY_F12,
-  GLFW_KEY_1, GLFW_KEY_2, GLFW_KEY_3, GLFW_KEY_4, GLFW_KEY_5, GLFW_KEY_6, GLFW_KEY_7, GLFW_KEY_8, GLFW_KEY_9,
-  GLFW_KEY_H, GLFW_KEY_F, GLFW_KEY_G,
+  GLFW_KEY_ESCAPE,
+  GLFW_KEY_F1, GLFW_KEY_F2, GLFW_KEY_F3, GLFW_KEY_F4,
+  GLFW_KEY_F5, GLFW_KEY_F6, GLFW_KEY_F7, GLFW_KEY_F8,
+  GLFW_KEY_F9, GLFW_KEY_F10, GLFW_KEY_F11, GLFW_KEY_F12,
   -1
 };
 
@@ -12,7 +13,7 @@ static char *key_name[CONTROLS_MOUSE_KEY_LIMIT];
 //--page-split-- controls_initialize
 
 void controls_initialize() {
-  key_name[' '] = "space";
+  key_name[GLFW_KEY_SPACE] = "space";
   key_name[GLFW_KEY_APOSTROPHE] = "'\"";
   key_name[GLFW_KEY_COMMA] = ",<";
   key_name[GLFW_KEY_MINUS] = "-_";
@@ -131,15 +132,15 @@ void controls_initialize() {
   key_name[GLFW_KEY_RIGHT_CONTROL] = "right control";
   key_name[GLFW_KEY_RIGHT_ALT] = "right alt";
   key_name[GLFW_KEY_RIGHT_SUPER] = "right super";
-  key_name[GLFW_KEY_MENU] = "menu";
-  key_name[CONTROLS_MOUSE_KEY_LEFT] = "left mouse";
-  key_name[CONTROLS_MOUSE_KEY_RIGHT] = "right mouse";
-  key_name[CONTROLS_MOUSE_KEY_MIDDLE] = "middle mouse";
-  key_name[CONTROLS_MOUSE_KEY_BUTTON4] = "mouse 4";
-  key_name[CONTROLS_MOUSE_KEY_BUTTON5] = "mouse 5";
-  key_name[CONTROLS_MOUSE_KEY_BUTTON6] = "mouse 6";
-  key_name[CONTROLS_MOUSE_KEY_BUTTON7] = "mouse 7";
-  key_name[CONTROLS_MOUSE_KEY_BUTTON8] = "mouse 8";
+  key_name[GLFW_KEY_MENU] = "menu key";
+  key_name[CONTROLS_MOUSE_KEY_LEFT] = "left click";
+  key_name[CONTROLS_MOUSE_KEY_RIGHT] = "right click";
+  key_name[CONTROLS_MOUSE_KEY_MIDDLE] = "middle click";
+  key_name[CONTROLS_MOUSE_KEY_BUTTON4] = "mouse button 4";
+  key_name[CONTROLS_MOUSE_KEY_BUTTON5] = "mouse button 5";
+  key_name[CONTROLS_MOUSE_KEY_BUTTON6] = "mouse button 6";
+  key_name[CONTROLS_MOUSE_KEY_BUTTON7] = "mouse button 7";
+  key_name[CONTROLS_MOUSE_KEY_BUTTON8] = "mouse button 8";
 };
 
 //--page-split-- controls_key_is_invalid
@@ -164,14 +165,12 @@ char *controls_key_name (int value) {
 //--page-split-- controls_get_key
 
 // glfwGetKey replacement
-int controls_get_key(int key_id) {
+int controls_get_key (int key_id) {
     if (event_key_state[option_key_input[key_id][0]] || event_key_state[option_key_input[key_id][1]]) return (1);
     return (0);
 }
 
 //--page-split-- controls_menu_key
-
-// KEY macro wrapper
 
 int controls_menu_key (int key_id) {
     if (KEY == option_key_input[key_id][0] || KEY == option_key_input[key_id][1]) return (1);

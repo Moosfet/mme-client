@@ -134,13 +134,8 @@ void map_begin_render() {
   complete_chunks = 0;
   quad_count = 0;
 
-  if (option_optimize_chunks) {
-    area = area_c;
-    area_count = area_count_c;
-  } else {
-    area = area_a;
-    area_count = area_count_a;
-  };
+  area = area_c;
+  area_count = area_count_c;
 
   // Start chunk threads...
 
@@ -414,6 +409,15 @@ static void use_map_coordinates(int eye) {
 
   // Set window coordinates to map coordinates.
   glMatrixMode(GL_PROJECTION); glLoadIdentity();
+
+  if (0) {
+    // temporal antialiasing
+    double px = 1.0 / display_window_width;
+    double py = 1.0 / display_window_height;
+    double rx = easy_random(256) / 256.0 - 0.5;
+    double ry = easy_random(256) / 256.0 - 0.5;
+    glTranslated(px * rx, py * ry, 0.0);
+  };
 
   if (option_anaglyph_enable) {
     // The window coordinates here, left to right, is -1.0 to +1.0
@@ -2255,6 +2259,7 @@ void map_render() {
     #endif
 
     lag_push(1, "chunk visibility");
+    glEnable(GL_MULTISAMPLE);
     int chunks_in_view = 0;
     for (int layer = 0; layer < chunk_limit; layer += chunk_dimension.x * chunk_dimension.y * chunk_dimension.z) {
       if (layer) glDepthMask(GL_FALSE);
@@ -2316,6 +2321,7 @@ void map_render() {
       };
     };
     map_percentage_in_view = 100.0 * chunks_in_view / chunk_limit;
+    glDisable(GL_MULTISAMPLE);
     lag_pop();
 
     WHAT("after rendering map");

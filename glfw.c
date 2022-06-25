@@ -135,7 +135,12 @@ void glfw_open_window() {
   glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
   glfwWindowHint(GLFW_SRGB_CAPABLE, GL_TRUE);
   glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
-  glfwWindowHint(GLFW_SAMPLES, 4 * option_fsaa_samples);
+
+  if (option_fsaa_samples) {
+    glfwWindowHint(GLFW_SAMPLES, 4);
+  } else {
+    glfwWindowHint(GLFW_SAMPLES, 0);
+  };
 
   GLFWmonitor *monitor = glfwGetPrimaryMonitor();
   const GLFWvidmode *mode = glfwGetVideoMode(monitor);
@@ -159,7 +164,6 @@ void glfw_open_window() {
 
   int center_instead = 0;
   if (option_window_location == 2) {
-    printf("Should we restore window position (%d, %d)?\n", option_window_location_x, option_window_location_y);
     if (get_monitor_of_game_window(option_window_location_x, option_window_location_y, option_window_width, option_window_height)) {
       printf("Attempting to restore window position (%d, %d)\n", option_window_location_x, option_window_location_y);
       glfwSetWindowPos(glfw_window, option_window_location_x, option_window_location_y);
@@ -183,13 +187,27 @@ void glfw_open_window() {
   glfwSetWindowCloseCallback(glfw_window, window_close_callback);
 
   glfw_mouse_capture_flag = 0;
-  int samples = glfwGetWindowAttrib(glfw_window, GLFW_SAMPLES);
-  printf("Opened window with GLFW_SAMPLES == %d.\n", samples);
+
+  if (option_fsaa_samples) {
+    //glEnable(GL_MULTISAMPLE);
+    // this shit seems to be broken
+    //void glMinSampleShading(GLfloat value);
+    //glMinSampleShading(1.0);
+    //glEnable(GL_SAMPLE_SHADING);
+  } else {
+    //glDisable(GL_MULTISAMPLE);
+  };
+
+  int samples;
+  glGetIntegerv(GL_SAMPLES, &samples);
+  printf("Opened window with GL_SAMPLES == %d.\n", samples);
 
   // I should try this SRGB thing sometime.
   //glEnable(GL_FRAMEBUFFER_SRGB);
 
   glfwSwapInterval(!!option_request_vertical_sync);
+
+  glfw_fullscreen(option_fullscreen);
 };
 
 //--page-split-- glfw_close_window
