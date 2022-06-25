@@ -121,6 +121,8 @@ void menus_play_focus_lost() {
 
 void menus_play() {
 
+  const int do_in_advance = 1;
+
   lag_push(1, "menus_play()");
 
   //if (option_hyper_help && map_is_active()) {
@@ -286,18 +288,18 @@ void menus_play() {
             sound_play(SOUND_BLOCK_PLACE, 0.1f, NULL);
 
             if (controls_get_key (CONTROLS_KEY_BLOCK_REPLACE)) {
-              map_modify(map_selection.destroy, menus_play_create_type, 0);
+              if (do_in_advance) map_modify(map_selection.destroy, menus_play_create_type, 0);
               server_modify(map_selection.destroy, menus_play_create_type);
               replace_block = 1;
             } else {
-              map_modify(map_selection.create, menus_play_create_type, 0);
+              if (do_in_advance) map_modify(map_selection.create, menus_play_create_type, 0);
               server_modify(map_selection.create, menus_play_create_type);
               replace_block = 0;
             }
           };
           if (destroy_press) {
             sound_play(SOUND_BLOCK_REMOVE, 0.1f, NULL);
-            map_modify(map_selection.destroy, map_get_block_type(map_selection.create), 0);
+            if (do_in_advance) map_modify(map_selection.destroy, map_get_block_type(map_selection.create), 0);
             server_modify(map_selection.destroy, map_get_block_type(map_selection.create));
           };
         };
@@ -348,7 +350,7 @@ void menus_play() {
             map_selection_color = 4;
             if (create_release) {
               sound_play(SOUND_BLOCK_PLACE, 0.1f, NULL);
-              map_modify(map_selection_corner_one, menus_play_create_type, 0);
+              if (do_in_advance) map_modify(map_selection_corner_one, menus_play_create_type, 0);
               server_modify(map_selection_corner_one, menus_play_create_type);
               map_selection_color = -1;
               step = 0;
@@ -360,7 +362,7 @@ void menus_play() {
               map_selection_color = 4;
               if (create_release) {
                 sound_play(SOUND_BLOCK_PLACE, 0.1f, NULL);
-                map_modify_bunch(map_selection_corner_one, map_selection_corner_two, menus_play_create_type, 0);
+                if (do_in_advance) map_modify_bunch(map_selection_corner_one, map_selection_corner_two, menus_play_create_type, 0);
                 lag_push(1, "server_modify_bunch()");
                 server_modify_bunch(map_selection_corner_one, map_selection_corner_two, menus_play_create_type);
                 lag_pop();
@@ -392,7 +394,7 @@ void menus_play() {
             map_selection_color = 4;
             if (destroy_release) {
               sound_play(SOUND_BLOCK_REMOVE, 0.1f, NULL);
-              map_modify(map_selection_corner_one, menus_play_destroy_type, 0);
+              if (do_in_advance) map_modify(map_selection_corner_one, menus_play_destroy_type, 0);
               server_modify(map_selection_corner_one, menus_play_destroy_type);
               map_selection_color = -1;
               step = 0;
@@ -403,7 +405,7 @@ void menus_play() {
               map_selection_color = 4;
               if (destroy_release) {
                 sound_play(SOUND_BLOCK_REMOVE, 0.1f, NULL);
-                map_modify_bunch(map_selection_corner_one, map_selection_corner_two, menus_play_destroy_type, 0);
+                if (do_in_advance) map_modify_bunch(map_selection_corner_one, map_selection_corner_two, menus_play_destroy_type, 0);
                 lag_push(1, "server_modify_bunch()");
                 server_modify_bunch(map_selection_corner_one, map_selection_corner_two, menus_play_destroy_type);
                 lag_pop();
@@ -661,7 +663,7 @@ void menus_play() {
                   //};
                   if (map_get_block_type(map_coord) != block) {
                     paste_data[o] = block;
-                    //map_modify(map_coord, block, 0);
+                    //if (do_in_advance) map_modify(map_coord, block, 0);
                     //server_modify(map_coord, block);
                     //printf("Building type %d at (%d, %d, %d)\n", block, map_coord.x, map_coord.y, map_coord.z);
                   };
@@ -669,6 +671,7 @@ void menus_play() {
               };
             };
             if (server_paste(min_coord, dimension, paste_data)) {
+              sound_play(SOUND_BLOCK_PLACE, 0.1f, NULL);
               for (int z = 0; z < dimension.z; z++) {
                 for (int y = 0; y < dimension.y; y++) {
                   for (int x = 0; x < dimension.x; x++) {
@@ -678,8 +681,7 @@ void menus_play() {
                     map_coord.z = min_coord.z + z;
                     int o = (z * dimension.y + y) * dimension.x + x;
                     if (paste_data[o] != 0) {
-                      sound_play(SOUND_BLOCK_PLACE, 0.1f, NULL);
-                      map_modify(map_coord, paste_data[o], 0);
+                      if (do_in_advance) map_modify(map_coord, paste_data[o], 0);
                     };
                   };
                 };
@@ -706,7 +708,7 @@ void menus_play() {
           if (menus_play_create_type != map_get_block_type(map_selection.destroy)) {
             paint_target_type = map_get_block_type(map_selection.destroy);
             paint_with_type = menus_play_create_type;
-            map_modify(map_selection.destroy, menus_play_create_type, 0);
+            if (do_in_advance) map_modify(map_selection.destroy, menus_play_create_type, 0);
             server_modify(map_selection.destroy, menus_play_create_type);
             (*paint_list)[0] = map_selection.destroy;
             paint_list_size = 1;
