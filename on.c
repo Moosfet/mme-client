@@ -16,7 +16,9 @@ void on_program_start(int argc, char **argv) {
   printf("SVN revision %s\n", build_svn_string);
   printf("Compiled %s for %s\n", build_compile_date, build_target);
 
+  #ifdef LINUX
   backtrace_initialize();
+  #endif
 
   memory_initialize();
   cpu_initialize();

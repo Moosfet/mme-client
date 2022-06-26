@@ -2359,9 +2359,7 @@ void map_render() {
     #endif
 
     glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
 
-    #if 0
     glPushMatrix();
 
     // Slightly back away from the scene, so that we can draw on top of it.
@@ -2373,17 +2371,17 @@ void map_render() {
     t.x = v.x * cos(player_view.u) - v.y * sin(player_view.u);
     t.y = v.x * sin(player_view.u) + v.y * cos(player_view.u);
     v.x = t.x; v.y = t.y;
-    glTranslated(-1.0/64 * v.x, -1.0/64 * v.y, -1.0/64 * v.z);
-    #endif
+    glTranslated(-0.01 * v.x, -0.01 * v.y, -0.01 * v.z);
 
     draw_selection();
 
     draw_cursor();
 
-    //glPopMatrix();
+    glPopMatrix();
 
   };
   glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+  glDisable(GL_DEPTH_TEST);
   glDisable(GL_SCISSOR_TEST);
   glDisable(GL_FOG);
 

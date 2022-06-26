@@ -64,8 +64,6 @@
 #include "zlib.h"
 #endif
 
-//#include "../glfw/glfw-2.7.7/include/GL/glfw.h"
-//#include "../libraries/zlib.h"
 #include "GL/glu.h"
 
 #include "stb_image.h"
@@ -73,6 +71,21 @@
 #include "stb_vorbis.h"
 
 #include "protocol.h"
+
+// some stuff ain't defined for Windows for some reason
+
+#ifndef GL_SAMPLES
+  #define GL_SAMPLES 0x80A9
+#endif
+#ifndef GL_MULTISAMPLE
+  #define GL_MULTISAMPLE 0x809D
+#endif
+#ifndef GL_TEXTURE_MAX_ANISOTROPY_EXT
+  #define GL_TEXTURE_MAX_ANISOTROPY_EXT 0x84FE
+#endif
+#ifndef GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT
+  #define GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT 0x84FF
+#endif
 
 //--page-split-- global constants
 
