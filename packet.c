@@ -410,6 +410,33 @@ int packet_send(int packet_type, ...) {
     send_packet(packet, header_size + 12);
     send_packet(pointer, size);
 
+  } else if (packet_type == PACKET_BUFFER_RESET) {
+
+    data_size = va_arg(ooo, int);
+    char *pointer = va_arg(ooo, char *);
+    send_packet(packet, header_size);
+    send_packet(pointer, data_size);
+
+  } else if (packet_type == PACKET_BUFFER_APPEND) {
+
+    data_size = va_arg(ooo, int);
+    char *pointer = va_arg(ooo, char *);
+    send_packet(packet, header_size);
+    send_packet(pointer, data_size);
+
+  } else if (packet_type == PACKET_BUFFER_IS_MAP_DATA) {
+
+    struct int_xyz lc = va_arg(ooo, struct int_xyz);
+    struct int_xyz uc = va_arg(ooo, struct int_xyz);
+    DATA(0, unsigned short) = lc.x;
+    DATA(2, unsigned short) = lc.y;
+    DATA(4, unsigned short) = lc.z;
+    DATA(6, unsigned short) = uc.x;
+    DATA(8, unsigned short) = uc.y;
+    DATA(10, unsigned short) = uc.z;
+    data_size = 12;
+    send_packet(packet, header_size + 12);
+
   } else if (packet_type == PACKET_PROJECTILE_CREATE) {
 
     DATA(0, unsigned char) = va_arg(ooo, int);

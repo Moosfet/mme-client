@@ -1360,30 +1360,47 @@ int server_paste(struct int_xyz lower_corner, struct int_xyz dimension, char *da
 
   int paste_successful = 0;
 
-  can_buffer = 0; can_compress = 0;
-
-  #ifndef TEST
-
-  #endif
-
   if (can_buffer || can_compress) {
-    char *compressed_data = NULL;
-    memory_allocate(&compressed_data, 65536);
+    int result;
     z_stream stream = {};
     stream.next_in = output;
     stream.avail_in = output_dimension.x * output_dimension.y * output_dimension.z;
-    stream.next_out = compressed_data;
-    stream.avail_out = 65535;
-    deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15, 9, Z_DEFAULT_STRATEGY);
-    int result = deflate(&stream, Z_FINISH);
-    if (result == Z_STREAM_END && 65535 - stream.avail_out < 65535 - 12) {
-      int data_size = 65535 - stream.avail_out;
-      printf("Pasting via PACKET_MAP_DATA (data size is %d bytes)...\n", data_size);
-      packet_send(PACKET_MAP_DATA, output_lower_corner, output_upper_corner, data_size, compressed_data);
+    stream.next_out = NULL;
+    stream.avail_out = 0;
+    result = deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15, 9, Z_DEFAULT_STRATEGY);
+    if (result != Z_OK) {
+      fprintf(stderr, "deflateInit2() returned error %d", result);
+      easy_fuck("zlib error");
+    };
+    char *compressed_data = NULL;
+    int allocation_size = 0;
+    int compressed_size = 0;
+    do {
+      allocation_size += 65536;
+      memory_allocate(&compressed_data, allocation_size);
+      stream.next_out = compressed_data + compressed_size;
+      stream.avail_out = allocation_size - compressed_size;
+      result = deflate(&stream, Z_FINISH);
+      if (result != Z_OK && result != Z_STREAM_END) {
+        fprintf(stderr, "zlib returned error %d", result);
+        easy_fuck("zlib error");
+      };
+      compressed_size = allocation_size - stream.avail_out;
+    } while (result != Z_STREAM_END);
+    deflateEnd(&stream);
+    if (0 && compressed_size < 65535 - 12) {
+      printf("Pasting via PACKET_MAP_DATA (data size is %d bytes)...\n", compressed_size);
+      packet_send(PACKET_MAP_DATA, output_lower_corner, output_upper_corner, compressed_size, compressed_data);
       paste_successful = 1;
-    } else {
-      printf("I don't know how to properly send such a large paste!\n");
-      printf("result = %d, size = %d\n", result, 65535 - stream.avail_out);
+    } else if (can_buffer) {
+      printf("Pasting via PACKET_BUFFER_IS_MAP_DATA (data size is %d bytes)...\n", compressed_size);
+      packet_send(PACKET_BUFFER_RESET);
+      for (int i = 0; i < compressed_size; i += 65535) {
+        int length = compressed_size - i;
+        if (length > 65535) length = 65535;
+        packet_send(PACKET_BUFFER_APPEND, length, compressed_data + i);
+      };
+      paste_successful = 1;
     };
     deflateEnd(&stream);
     memory_allocate(&compressed_data, 0);
@@ -1391,6 +1408,11 @@ int server_paste(struct int_xyz lower_corner, struct int_xyz dimension, char *da
 
   // Send one block at a time, if previous attempt failed.
   if (!paste_successful) {
+    int dx = (output_upper_corner.x - output_lower_corner.x + 1);
+    int dy = (output_upper_corner.y - output_lower_corner.y + 1);
+    int dz = (output_upper_corner.z - output_lower_corner.z + 1);
+    int count = dx * dy * dz;
+    printf("Pasting via %d PACKET_MAP_MODIFY packets...\n", count);
     struct int_xyz c;
     char *block = output;
     for (c.z = output_lower_corner.z; c.z <= output_upper_corner.z; c.z++) {

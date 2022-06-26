@@ -1,5 +1,6 @@
 short-term:
 
+  mouse click jump
   add descent-like flying
   anisotropic filtering and antialiasing settings
   remove F G H special actions

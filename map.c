@@ -1,5 +1,7 @@
 #include "everything.h"
 
+int map_chunk_bits = 5;
+
 #define CHUNK_RING_SIZE 4  // buffered chunks per thread, 4 is all we need
 
 struct structure_chunk_thread_data {
@@ -23,7 +25,6 @@ double map_percentage_in_view = 0.0;
 double map_perspective_angle = 45.0;
 double map_crosshair_distance = 0.5;
 struct structure_map_data map_data = {};
-int map_chunk_bits = 5;
 int map_cursor_color = -1;
 
 #define map map_data
@@ -1035,9 +1036,9 @@ static void compile_chunk(struct int_xyz chunk, struct structure_render_list **r
   #define SD short_distance
   #define EC extra_chunks
 
-  #define CC (2 * EC + 1)
-  #define BC (CC * 32)
-  #define BL (CC * 32 - 1)
+  #define CC (2 * EC + 1)          // chunk count (one dimension) of light area
+  #define BC (CC * chunk_size)     // block count of the same
+  #define BL (CC * chunk_size - 1) // one less?  why does this need a #define?
 
   int light_distance;
   int short_distance;
@@ -1089,15 +1090,19 @@ static void compile_chunk(struct int_xyz chunk, struct structure_render_list **r
           if (c.y + chunk.y < 0 || c.y + chunk.y >= chunk_dimension.y) continue;
           if (c.z + chunk.z < 0 || c.z + chunk.z >= chunk_dimension.z) continue;
           char *base = map_data.block +
-            ((c.z + chunk.z) * 32 * map_data.dimension.y +
-            (c.y + chunk.y) * 32) * map_data.dimension.x +
-            (c.x + chunk.x) * 32;
-          for (int z = 0; z < 32; z++) {
-            for (int y = 0; y < 32; y++) {
+            ((c.z + chunk.z) * chunk_size * map_data.dimension.y +
+            (c.y + chunk.y) * chunk_size) * map_data.dimension.x +
+            (c.x + chunk.x) * chunk_size;
+          for (int z = 0; z < chunk_size; z++) {
+            if ((chunk.z + c.z) * chunk_size + z >= map_data.dimension.z) break;
+            for (int y = 0; y < chunk_size; y++) {
               memmove(
-                b + ((32 * (c.z + EC) + z) * BC + (32 * (c.y + EC) + y)) * BC + 32 * (c.x + EC),
+                b + ((
+                  chunk_size * (c.z + EC) + z)
+                  * BC + (chunk_size * (c.y + EC) + y))
+                  * BC + chunk_size * (c.x + EC),
                 base + (z * map_data.dimension.y + y) * map_data.dimension.x,
-                32
+                chunk_size
               );
             };
           };
@@ -1116,14 +1121,14 @@ static void compile_chunk(struct int_xyz chunk, struct structure_render_list **r
     {
       a.z = BL;
       struct int_xyz b;
-      b.z = 32 * chunk.z + a.z - 32 * EC;
+      b.z = chunk_size * chunk.z + a.z - chunk_size * EC;
       if (b.z < map_data.dimension.z) {
-        int z_limit = 32 * chunk.z + 96;
+        int z_limit = chunk_size * chunk.z + 96;
         for (a.y = 0; a.y < BC; a.y++) {
-          b.y = 32 * chunk.y + a.y - 32 * EC;
+          b.y = chunk_size * chunk.y + a.y - chunk_size * EC;
           if (b.y < 0 || b.y >= map_data.dimension.y) continue;
           for (a.x = 0; a.x < BC; a.x++) {
-            b.x = 32 * chunk.x + a.x - 32 * EC;
+            b.x = chunk_size * chunk.x + a.x - chunk_size * EC;
             if (b.x < 0 || b.x >= map_data.dimension.x) continue;
             char *base = map_data.block + (b.z * map_data.dimension.y + b.y) * map_data.dimension.x + b.x;
             char *base_limit = map_data.block + (z_limit * map_data.dimension.y + b.y) * map_data.dimension.x + b.x;
@@ -1452,7 +1457,7 @@ static void compile_chunk(struct int_xyz chunk, struct structure_render_list **r
             if (block_data[i].emission) {
               light[c.x][c.y] = 255;
             } else {
-              int t = L(o.x - 32 * chunk.x + 32 * EC, o.y - 32 * chunk.y + 32 * EC, o.z - 32 * chunk.z + 32 * EC);
+              int t = L(o.x - chunk_size * chunk.x + chunk_size * EC, o.y - chunk_size * chunk.y + chunk_size * EC, o.z - chunk_size * chunk.z + chunk_size * EC);
               //if (option_quantization && t < 64) t = 3 * ceil(t / 3.0);
               light[c.x][c.y] = t;
             };
