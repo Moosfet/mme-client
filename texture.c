@@ -18,6 +18,8 @@ struct structure_texture_data texture_data[TEXTURE_MAX_TEXTURES] = {};
 
 GLuint texture_load (char *file, int size, int flags) {
 
+  CHECK_GL_ERROR;
+
   // Loads a texture from file or memory.
   // If size == 0, then file is a pointer to a file name.
   // If size > 0, then file is a pointer to the file in memory.
@@ -80,7 +82,7 @@ GLuint texture_load (char *file, int size, int flags) {
 
   // Generate texture name and select that texture.
   GLuint name;
-  glGenTextures(2, &name);
+  glGenTextures(2, &name); CHECK_GL_ERROR;
 
   for (int i = 0; i < 2; i++) {
 
@@ -95,7 +97,7 @@ GLuint texture_load (char *file, int size, int flags) {
       };
     };
 
-    glBindTexture(GL_TEXTURE_2D, name + i);
+    glBindTexture(GL_TEXTURE_2D, name + i); CHECK_GL_ERROR;
 
     // anisotropic filtering
 
@@ -107,24 +109,24 @@ GLuint texture_load (char *file, int size, int flags) {
     #endif
 
     if (flags & TEXTURE_FLAG_PIXELATE) {
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); CHECK_GL_ERROR;
     } else {
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); CHECK_GL_ERROR;
     };
     if (flags & TEXTURE_FLAG_MIPMAP) {
       if (0) { // option_anisotropic_filtering
         float max = 1.0f;
-        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max);
+        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max); CHECK_GL_ERROR;
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max); CHECK_GL_ERROR;
       };
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR); CHECK_GL_ERROR;
       lag_push(1000, "generating mipmaps");
-      gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, x, y, GL_RGBA, GL_UNSIGNED_BYTE, data);
+      gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, x, y, GL_RGBA, GL_UNSIGNED_BYTE, data); CHECK_GL_ERROR;
       lag_pop();
     } else {
-      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 0.0);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.0); CHECK_GL_ERROR;
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); CHECK_GL_ERROR;
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, GL_RGBA, GL_UNSIGNED_BYTE, data); CHECK_GL_ERROR;
     };
 
   };

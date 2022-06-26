@@ -24,6 +24,8 @@
   #include <winsock2.h>
   #include <windows.h>
   #include <ws2tcpip.h>
+  #define COLOR_ON ""
+  #define COLOR_OFF ""
 #else
   #include <errno.h>
   #include <sys/types.h>
@@ -34,6 +36,8 @@
   #include <netinet/tcp.h>
   #include <pthread.h>
   #include <signal.h>
+  #define COLOR_ON "\e[1;33m"
+  #define COLOR_OFF "\e[0m"
 #endif
 
 #ifdef LINUX
@@ -141,7 +145,7 @@ struct int_xyzs {
 
 #define FUCK printf("\e[1;33m%s:%d\e[0m\n", __FILE__, __LINE__);
 
-#define WHAT display_check_opengl_error
+#define CHECK_GL_ERROR {int error = glGetError(); if (error) printf("%s%s:%d: OpenGL error %d: %s%s\n", COLOR_ON, __FILE__, __LINE__, error, gluErrorString(error), COLOR_OFF); }
 
 #ifdef SAY_LOTSA_SHIT
   #define DEBUG(message) fprintf(stderr, "DEBUG: %s\n", message)
@@ -174,6 +178,12 @@ extern int argument_hacks;
 extern int argument_record_all_frames;
 
 void argument_check (int argc, char **argv);
+
+// backtrace.h
+
+#ifdef LINUX
+void backtrace_initialize();
+#endif
 
 // block.h
 

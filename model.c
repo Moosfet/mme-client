@@ -106,6 +106,8 @@ void model_render() {
       fraction = 45 * (fraction - round(fraction));
       fraction = 0;
 
+      // select which part of the texture to use
+      // depending on player's angle vs. the camera
       double coord[4];
       switch (angle) {
         case 0:

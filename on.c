@@ -15,10 +15,12 @@ void on_program_start(int argc, char **argv) {
   printf("Multiplayer Map Editor\n");
   printf("SVN revision %s\n", build_svn_string);
   printf("Compiled %s for %s\n", build_compile_date, build_target);
-
+FUCK
+  backtrace_initialize();
+FUCK
   memory_initialize();
   cpu_initialize();
-
+FUCK
   argument_check(argc, argv);
 
   #ifdef UNIX
@@ -137,7 +139,10 @@ void on_frame() {
   lag_pop();
 
   lag_push(100, "display_render()");
-  display_render(); // Render a frame as well as the menu on top of it.
+  // Render a frame as well as the menu on top of it.
+  CHECK_GL_ERROR;
+  display_render();
+  CHECK_GL_ERROR;
   lag_pop();
 
   glFlush();
@@ -272,32 +277,35 @@ void on_frame() {
 //--page-split-- on_open_window
 
 void on_open_window() {
+  CHECK_GL_ERROR;
 
-  glfw_open_window();
-  statistics_open_window();
-  display_open_window();
-  gui_open_window();
-  event_open_window();
-  model_open_window();
-  map_open_window();
-  stars_open_window();
-  texture_open_window();
+  glfw_open_window();       CHECK_GL_ERROR;
+  statistics_open_window(); CHECK_GL_ERROR;
+  display_open_window();    CHECK_GL_ERROR;
+  gui_open_window();        CHECK_GL_ERROR;
+  event_open_window();      CHECK_GL_ERROR;
+  model_open_window();      CHECK_GL_ERROR;
+  map_open_window();        CHECK_GL_ERROR;
+  stars_open_window();      CHECK_GL_ERROR;
+  texture_open_window();    CHECK_GL_ERROR;
 
   glfw_set_window_title(NULL);
 
+  CHECK_GL_ERROR;
 };
 
 //--page-split-- on_close_window
 
 void on_close_window() {
+  CHECK_GL_ERROR;
 
-  texture_close_window();
-  stars_close_window();
-  map_close_window();
-  model_close_window();
-  gui_close_window();
-  display_close_window();
-  glfw_close_window();
+  texture_close_window();   CHECK_GL_ERROR;
+  stars_close_window();     CHECK_GL_ERROR;
+  map_close_window();       CHECK_GL_ERROR;
+  model_close_window();     CHECK_GL_ERROR;
+  gui_close_window();       CHECK_GL_ERROR;
+  display_close_window();   CHECK_GL_ERROR;
+  glfw_close_window();      CHECK_GL_ERROR;
 
 };
 

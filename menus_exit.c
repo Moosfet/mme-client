@@ -14,6 +14,8 @@ void menus_exit_immediately() {
 
 void menus_exit() {
 
+  glfw_fullscreen(0);
+
   if (!cache) {
     nag = option_advertise;
     cache = 1;

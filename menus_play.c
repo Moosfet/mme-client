@@ -31,6 +31,11 @@ static struct int_xyz box_size = {};
 static int saw_chat_menu_key_press[2] = {};
 static int saw_server_menu_key_press[2] = {};
 
+static double cuboid_start_time = 0;
+static double message_no_fly = 0;
+static double message_no_noclip = 0;
+static double message_no_gun = 0;
+
 //--page-split-- check_box_size
 
 static int check_box_size(struct int_xyz one, struct int_xyz two) {
@@ -95,11 +100,6 @@ void menus_play_reset() {
   menus_play_last_click_valid = 0;
 };
 
-static double cuboid_start_time = 0;
-static double message_no_fly = 0;
-static double message_no_noclip = 0;
-static double message_no_gun = 0;
-
 //--page-split-- menus_play_focus_lost
 
 void menus_play_focus_lost() {
@@ -114,10 +114,10 @@ void menus_play_focus_lost() {
   saw_server_menu_key_press[1] = 0;
 };
 
+//--page-split-- menus_play
+
 #define building_is_allowed (menus_play_box_dimension_limit > 0 && menus_play_box_volume_limit > 0 && (packet_is_sendable(PACKET_MAP_MODIFY) || packet_is_sendable(PACKET_MAP_FILL)))
 #define cuboid_is_allowed (menus_play_box_enable && menus_play_box_dimension_limit > 1 && menus_play_box_volume_limit > 1 && packet_is_sendable(PACKET_MAP_MODIFY))
-
-//--page-split-- menus_play
 
 void menus_play() {
 
@@ -185,6 +185,7 @@ void menus_play() {
       if (KEY == option_key_input[CONTROLS_KEY_CHAT][1]) saw_chat_menu_key_press[1] = 1;
       if (KEY == option_key_input[CONTROLS_KEY_SERVER_MENU][0]) saw_server_menu_key_press[0] = 1;
       if (KEY == option_key_input[CONTROLS_KEY_SERVER_MENU][1]) saw_server_menu_key_press[1] = 1;
+      if (KEY == GLFW_KEY_F2) server_menu_request();
       if (controls_menu_key (CONTROLS_KEY_MODE_FLY)) {
         if (!player_allow_flying) {
           message_no_fly = on_frame_time + 3;
@@ -224,14 +225,8 @@ void menus_play() {
     if (KEY_RELEASE_EVENT) {
       if (KEY == option_key_input[CONTROLS_KEY_CHAT][0] && saw_chat_menu_key_press[0] == 1) menu_switch(menus_chat);
       if (KEY == option_key_input[CONTROLS_KEY_CHAT][1] && saw_chat_menu_key_press[1] == 1) menu_switch(menus_chat);
-      if (KEY == option_key_input[CONTROLS_KEY_SERVER_MENU][0] && saw_server_menu_key_press[0] == 1) {
-        saw_server_menu_key_press[0] = 0;
-        server_menu_request();
-      };
-      if (KEY == option_key_input[CONTROLS_KEY_SERVER_MENU][1] && saw_server_menu_key_press[1] == 1) {
-        saw_server_menu_key_press[1] = 0;
-        server_menu_request();
-      };
+      if (KEY == option_key_input[CONTROLS_KEY_SERVER_MENU][0] && saw_server_menu_key_press[0] == 1) server_menu_request();
+      if (KEY == option_key_input[CONTROLS_KEY_SERVER_MENU][1] && saw_server_menu_key_press[1] == 1) server_menu_request();
 
       if (controls_menu_key (CONTROLS_KEY_MODE_NOCLIP)) {
         if (option_noclip == 0) {

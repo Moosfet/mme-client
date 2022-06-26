@@ -1,9 +1,10 @@
 short-term:
 
-  mouse click jump
+  network error messages
+  is anaglyph mode working correctly?
+  cursor outside of game window when captured
   add descent-like flying
-  anisotropic filtering and antialiasing settings
-  remove F G H special actions
+  make all the menus smaller
 
 long-term:
 

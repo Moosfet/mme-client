@@ -1400,6 +1400,7 @@ int server_paste(struct int_xyz lower_corner, struct int_xyz dimension, char *da
         if (length > 65535) length = 65535;
         packet_send(PACKET_BUFFER_APPEND, length, compressed_data + i);
       };
+      packet_send(PACKET_BUFFER_IS_MAP_DATA, output_lower_corner, output_upper_corner);
       paste_successful = 1;
     };
     deflateEnd(&stream);

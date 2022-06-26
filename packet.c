@@ -412,10 +412,8 @@ int packet_send(int packet_type, ...) {
 
   } else if (packet_type == PACKET_BUFFER_RESET) {
 
-    data_size = va_arg(ooo, int);
-    char *pointer = va_arg(ooo, char *);
+    data_size = 0;
     send_packet(packet, header_size);
-    send_packet(pointer, data_size);
 
   } else if (packet_type == PACKET_BUFFER_APPEND) {
 

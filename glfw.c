@@ -257,6 +257,7 @@ void glfw_fullscreen (int enable) {
     is_fullscreen_now = 1;
   };
   if (!enable && is_fullscreen_now) {
+    printf("Restoring window size to %d x %d\n", saved_width, saved_height);
     glfwSetWindowMonitor(glfw_window, NULL, saved_x, saved_y, saved_width, saved_height, GLFW_DONT_CARE);
     // In Wine, restoring the window position and size doesn't work,
     // but doing an extra window size call seems to fix the position too.

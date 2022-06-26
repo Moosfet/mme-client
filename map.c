@@ -385,7 +385,7 @@ static void use_map_coordinates(int eye) {
     use_incorrect_perspective = 1;
   } else {
     map_perspective_angle = 2.0 * atan(0.5 * display_window_height * option_anaglyph_pixel_size / option_anaglyph_distance) * 180 / M_PI;
-    //printf("dts=%0.1f  sop=%0.3f  vs=%0.1f  angle=%0.3f\n", option_perspective_distance, option_perspective_pixel_size, display_window_height * option_perspective_pixel_size, map_perspective_angle);
+    printf("dts=%0.1f  sop=%0.3f  vs=%0.1f  angle=%0.3f\n", option_anaglyph_distance, option_anaglyph_pixel_size, display_window_height * option_anaglyph_pixel_size, map_perspective_angle);
   };
 
   {
@@ -1992,40 +1992,31 @@ void map_render() {
 
     glClear(GL_COLOR_BUFFER_BIT);
     glClear(GL_DEPTH_BUFFER_BIT);
-    use_map_coordinates(eye);
+    use_map_coordinates(eye); CHECK_GL_ERROR;
 
-    WHAT("after setting coordinates");
-
-    if ((option_fog_type & 3) == 2) stars_render();
-    WHAT("after running stars_render()");
+    if ((option_fog_type & 3) == 2) stars_render(); CHECK_GL_ERROR;
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
 
     int sucky_fog = 0;
     if (option_fog_type & 2) {
-      WHAT("before setting fog options");
       glEnable(GL_FOG);
       if (option_fog_type & 1) {
         glFogfv(GL_FOG_COLOR, (GLfloat[]) {0.75, 0.8, 0.85, 1.0});
       } else {
         glFogfv(GL_FOG_COLOR, (GLfloat[]) {0.05, 0.05, 0.05, 0.0});
       };
-      WHAT("1");
       glFogi(GL_FOG_MODE, GL_LINEAR);
       if (option_fog_type & 4) {
         glFogf(GL_FOG_START, 0.5 * statistics_fog_distance);
       } else {
         glFogf(GL_FOG_START, 0.0 * statistics_fog_distance);
       };
-      WHAT("2");
       glFogf(GL_FOG_END, 1.0 * statistics_fog_distance);
-      WHAT("3");
       glHint(GL_FOG_HINT, GL_NICEST);
-      WHAT("after setting fog options");
       glFogi(0x855A, 0x855B); // get better fog rendering on NVIDIA cards
-      sucky_fog = glGetError();
-      WHAT(NULL);
+      sucky_fog = glGetError(); // ignore GL errors if it isn't available
     } else {
       glDisable(GL_FOG);
     };
@@ -2248,7 +2239,7 @@ void map_render() {
     int rendered_chunks = 0, total_chunks = 0;
     #endif
 
-    WHAT("before rendering map");
+    CHECK_GL_ERROR;
 
     #if 0
     struct int_xyz block;
@@ -2314,22 +2305,20 @@ void map_render() {
       };
       if (layer) glDepthMask(GL_TRUE);
       else {
-        WHAT("after rendering map");
+        CHECK_GL_ERROR; // after rendering map
         lag_push(1, "model_render()");
-        model_render();
+        model_render(); CHECK_GL_ERROR;
         lag_pop();
-        WHAT("after rendering players");
         lag_push(1, "projectile_render()");
-        projectile_render();
+        projectile_render(); CHECK_GL_ERROR;
         lag_pop();
-        WHAT("after rendering projectiles");
       };
     };
     map_percentage_in_view = 100.0 * chunks_in_view / chunk_limit;
     glDisable(GL_MULTISAMPLE);
     lag_pop();
 
-    WHAT("after rendering map");
+    CHECK_GL_ERROR;
 
     #if 0
     char buffer[1048576];

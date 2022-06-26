@@ -370,7 +370,7 @@ void event_mouse_button_callback(GLFWwindow *window, int button, int action, int
   event_list[event_list_index][3] = event_mouse_position_x;
   event_list[event_list_index][4] = event_mouse_position_y;
   event_list_index++;
-  event_key_state[button + 512] = state;
+  event_key_state[button + CONTROLS_MOUSE_KEY] = state;
 
 };
 

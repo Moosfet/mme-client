@@ -65,16 +65,6 @@ void display_background_image() {
 
 };
 
-//--page-split-- display_check_opengl_error
-
-void display_check_opengl_error(char * message) {
-  int error = glGetError();
-  if (error && message) {
-    printf("At checkpoint '%s':\n", message);
-    printf("OpenGL error %d: %s\n", error, gluErrorString(error));
-  };
-};
-
 //--page-split-- display_render
 
 void display_render() {
@@ -103,8 +93,6 @@ void display_render() {
   lag_push(5, "menu_render()");
   menu_render();
   lag_pop();
-
-  WHAT("while rendering stuff"); // Displays OpenGL errors...
 
   DEBUG("leave display_render()");
 };

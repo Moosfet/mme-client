@@ -13,9 +13,9 @@ void menus_anaglyph() {
     last_value = one_value / display_window_width;
     two_value = strtod(two, NULL);
     three_value = strtod(three, NULL);
-    snprintf(one, 12, "%0.1f", one_value); one[12] = 0;
-    snprintf(two, 12, "%0.1f", two_value); two[12] = 0;
-    snprintf(three, 12, "%0.1f", three_value); three[12] = 0;
+    snprintf(one, 12, "%0.3f", one_value); one[12] = 0;
+    snprintf(two, 12, "%0.3f", two_value); two[12] = 0;
+    snprintf(three, 12, "%0.3f", three_value); three[12] = 0;
     option_anaglyph_pixel_size = one_value / display_window_width;
     option_anaglyph_distance = two_value;
     option_pupil_distance = three_value;
@@ -49,7 +49,7 @@ void menus_anaglyph() {
 
   if (last_width != display_window_width) {
     one_value = last_value * display_window_width;
-    snprintf(one, 12, "%0.1f", one_value); one[12] = 0;
+    snprintf(one, 12, "%0.3f", one_value); one[12] = 0;
     last_width = display_window_width;
   };
 

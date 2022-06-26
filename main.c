@@ -8,15 +8,14 @@ int main_terminate_flag = 0;
 
 int main(int argc, char **argv) {
 
-  on_program_start(argc, argv);
+  on_program_start(argc, argv); CHECK_GL_ERROR;
 
   do {
     main_restart_flag = 0;
-    on_open_window();
+    on_open_window(); CHECK_GL_ERROR;
     while (!main_restart_flag && !main_terminate_flag) on_frame();
-    on_close_window();
+    on_close_window(); CHECK_GL_ERROR;
   } while (main_restart_flag);
-
 
   on_program_exit();
 
