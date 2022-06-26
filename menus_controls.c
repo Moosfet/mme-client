@@ -5,6 +5,48 @@ static int *key_value = NULL;
 static double invalid_key_stamp = 0;
 int menus_controls_disable_function_keys = 0;
 
+//--page-split-- unassign_key
+
+static void unassign_key (int key) {
+  int a;
+  for (a = 0; a < CONTROLS_KEY_LIMIT; a++) {
+    if (option_key_input[a][0] == key) option_key_input[a][0] = 0;
+    if (option_key_input[a][1] == key) option_key_input[a][1] = 0;
+  }
+}
+
+//--page-split-- key_select
+
+static void key_select () {
+
+  if (menu_process_event && KEY_PRESS_EVENT) {
+    int q = KEY;
+    if (q == GLFW_KEY_ESCAPE) q = 0;
+    if (q && controls_key_is_invalid(q)) {
+      invalid_key_stamp = on_frame_time + 2.0;
+    } else {
+      unassign_key(q);
+      *key_value = q;
+      menus_controls_disable_function_keys = 0;
+      menu_switch(menus_controls);
+    };
+  }
+
+  if (gui_window(40, 4, 0)) menu_switch(key_select);
+
+  char *temp;
+  asprintf(&temp, "Press a new key for \e\x05%s\e\x09,", select_text);
+  gui_text(-1, 1, temp);
+  free(temp);
+
+  if (invalid_key_stamp >= on_frame_time) {
+    gui_text(-1, 2, "\e\x03""but not that key.  It's reserved.");
+  } else {
+    gui_text(-1, 2, "or press escape to choose nothing.");
+  };
+
+}
+
 //--page-split-- key_change_link
 
 static int key_change_link (int x, int y, char *desc, int option) {
@@ -18,7 +60,7 @@ static int key_change_link (int x, int y, char *desc, int option) {
     key_value = &option_key_input[option][0];
     strcpy (select_text, desc);
     menus_controls_disable_function_keys = 1;
-    menu_switch(menus_controls_key_select);
+    menu_switch(key_select);
   }
 
   gui_text(x + 30, y, "/");
@@ -29,7 +71,7 @@ static int key_change_link (int x, int y, char *desc, int option) {
     key_value = &option_key_input[option][1];
     strcpy (select_text, desc);
     menus_controls_disable_function_keys = 1;
-    menu_switch(menus_controls_key_select);
+    menu_switch(key_select);
   }
 
 }
@@ -82,45 +124,3 @@ void menus_controls() {
   if (gui_link(31, 20, "Reset Controls To Defaults")) option_key_reset();
 
 };
-
-//--page-split-- unassign_key
-
-static void unassign_key (int key) {
-  int a;
-  for (a = 0; a < CONTROLS_KEY_LIMIT; a++) {
-    if (option_key_input[a][0] == key) option_key_input[a][0] = 0;
-    if (option_key_input[a][1] == key) option_key_input[a][1] = 0;
-  }
-}
-
-//--page-split-- menus_controls_key_select
-
-void menus_controls_key_select () {
-
-  if (menu_process_event && KEY_PRESS_EVENT) {
-    int q = KEY;
-    if (q == GLFW_KEY_ESCAPE) q = 0;
-    if (q && controls_key_is_invalid(q)) {
-      invalid_key_stamp = on_frame_time + 2.0;
-    } else {
-      unassign_key(q);
-      *key_value = q;
-      menus_controls_disable_function_keys = 0;
-      menu_switch(menus_controls);
-    };
-  }
-
-  if (gui_window(40, 4, 0)) menu_switch(menus_controls_key_select);
-
-  char *temp;
-  asprintf(&temp, "Press a new key for \e\x05%s\e\x09,", select_text);
-  gui_text(-1, 1, temp);
-  free(temp);
-
-  if (invalid_key_stamp >= on_frame_time) {
-    gui_text(-1, 2, "\e\x03""but not that key.  It's reserved.");
-  } else {
-    gui_text(-1, 2, "or press escape to choose nothing.");
-  };
-
-}

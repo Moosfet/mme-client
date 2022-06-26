@@ -45,12 +45,12 @@ void display_background_image() {
 
   double tx, ty, offset;
   if (server_address != NULL && !strcmp(server_address, PORTAL_ADDRESS)) {
-    glBindTexture(GL_TEXTURE_2D, portal + option_anaglyph_enable);
+    glBindTexture(GL_TEXTURE_2D, portal + RENDER_IN_GRAYSCALE);
     tx = 0.5 * display_window_width / portal_width;
     ty = 0.5 * display_window_height / portal_height;
     offset = fmod(0.0 * on_frame_time, portal_height) / portal_height;
   } else {
-    glBindTexture(GL_TEXTURE_2D, background + option_anaglyph_enable);
+    glBindTexture(GL_TEXTURE_2D, background + RENDER_IN_GRAYSCALE);
     tx = 0.5 * display_window_width / background_width;
     ty = 0.5 * display_window_height / background_height;
     offset = fmod(60.0 * on_frame_time, background_height) / background_height;

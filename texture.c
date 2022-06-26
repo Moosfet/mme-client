@@ -153,7 +153,7 @@ void texture_list(int texture, char *file, int size, int flags) {
   texture_data[texture].b = texture_b / 255.0;
   texture_data[texture].a = texture_a / 255.0;
   glNewList(texture_list_base + texture, GL_COMPILE);
-  glBindTexture(GL_TEXTURE_2D, texture_data[texture].name + option_anaglyph_enable);
+  glBindTexture(GL_TEXTURE_2D, texture_data[texture].name + RENDER_IN_GRAYSCALE);
   glEndList();
 };
 
@@ -236,7 +236,7 @@ void texture_open_window() {
       };
     };
     glNewList(texture_list_base + i, GL_COMPILE);
-    glBindTexture(GL_TEXTURE_2D, texture_data[i].name + option_anaglyph_enable);
+    glBindTexture(GL_TEXTURE_2D, texture_data[i].name + RENDER_IN_GRAYSCALE);
     glEndList();
   };
 };
@@ -259,7 +259,7 @@ void texture_close_window() {
 void texture_rebind () {
   for (int i = 0; i < TEXTURE_MAX_TEXTURES; i++) {
     glNewList(texture_list_base + i, GL_COMPILE);
-    glBindTexture(GL_TEXTURE_2D, texture_data[i].name + option_anaglyph_enable);
+    glBindTexture(GL_TEXTURE_2D, texture_data[i].name + RENDER_IN_GRAYSCALE);
     glEndList();
   };
 };

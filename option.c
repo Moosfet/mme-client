@@ -28,7 +28,7 @@ int option_window_width;
 int option_window_height;
 int option_window_location;
 int option_remember_size;
-int option_fsaa_samples;
+int option_msaa_samples;
 int option_multiple_paste;
 int option_custom_fps;
 int option_hyper_help;
@@ -117,7 +117,7 @@ void option_load() {
   option_window_height = 0;
   option_window_location = 1;
   option_remember_size = 0;
-  option_fsaa_samples = 0;
+  option_msaa_samples = 0;
   option_multiple_paste = 0;
   option_custom_fps = 144;
   option_hyper_help = 1;
@@ -183,7 +183,7 @@ void option_load() {
     READ_WORD(option_window_height);
     READ_BYTE(option_window_location);
     READ_BYTE(option_remember_size);
-    READ_BYTE(option_fsaa_samples);
+    READ_BYTE(option_msaa_samples);
     READ_BYTE(option_multiple_paste);
     READ_WORD(option_custom_fps);
     READ_BYTE(option_hyper_help);
@@ -311,7 +311,7 @@ void option_save() {
   WRITE_WORD(option_window_height);
   WRITE_BYTE(option_window_location);
   WRITE_BYTE(option_remember_size);
-  WRITE_BYTE(option_fsaa_samples);
+  WRITE_BYTE(option_msaa_samples);
   WRITE_BYTE(option_multiple_paste);
   WRITE_WORD(option_custom_fps);
   WRITE_BYTE(option_hyper_help);

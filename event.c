@@ -2,7 +2,8 @@
 
 int event_disable_function_keys = 0;
 int event_mouse_button_state = 0;
-char event_key_state[530];
+int event_mouse_ignore_counter = 0;
+char event_key_state[CONTROLS_MOUSE_KEY_LIMIT];
 
 // See event.h for documentation.
 
@@ -397,8 +398,12 @@ void event_mouse_position_callback(GLFWwindow *window, double x, double y) {
   event_list[event_list_index][4] = y;
   event_list_index++;
   if (glfw_mouse_capture_flag) {
-    player_mouse_x_accumulator += x - event_mouse_position_x;
-    player_mouse_y_accumulator += y - event_mouse_position_y;
+    if (event_mouse_ignore_counter >= 0) {
+      event_mouse_ignore_counter--;
+    } else {
+      player_mouse_x_accumulator += x - event_mouse_position_x;
+      player_mouse_y_accumulator += y - event_mouse_position_y;
+    };
   };
   event_mouse_position_x = x;
   event_mouse_position_y = y;

@@ -54,9 +54,8 @@ void player_teleport(struct double_xyzuv position) {
 };
 
 // Distance traveled to make a footstep sound (in meters)
-// If someone cares, these should be calculated by the height of the player, instead of being guessed.
-#define STRIDE_WALK 1 //0.8128 // Average human walking stride, accroding to google (32 inches)
-#define STRIDE_RUN  2.1 //2.0 // guess; one article says 78 inches;
+#define STRIDE_WALK 0.75 // lots of conflicting numbers on the internet
+#define STRIDE_RUN  1.5  // just going with what sounds right
 
 //--page-split-- viscosity_test
 
@@ -148,8 +147,6 @@ static int collision_test(double px, double py, double pz) {
 
 static double gravity_test(double px, double py, double pz) {
 
-  //return -stairs_test(px, py, pz);
-
   // Returns (approximately) distance between feet and ground,
   // but multiplied by 1, and clamped to +/- 1.0, with positive
   // values meaning feet are above ground, and negative meaning
@@ -197,9 +194,6 @@ static double gravity_test(double px, double py, double pz) {
 static double stairs_test(double px, double py, double pz) {
 
   return -gravity_test(px, py, pz);
-
-  // stairs_test works like gravity_test except it returns
-  // a negative value, and ignores player_radius
 
 };
 
@@ -426,9 +420,7 @@ void player_movement() {
   #define RUNNING_SPEED (running_speed * SPEED_SCALE)
   #define SNEAKING_SPEED (walking_speed * SPEED_SCALE / 2.0)
 
-//  #define ACCELERATION 3.0 // Original Value
-  #define ACCELERATION (3.0 * SPEED_SCALE * SPEED_SCALE)  // Moosfet's New Value
-//  #define ACCELERATION 18.0  // Phaeloniamire's New Value
+  #define ACCELERATION (3.0 * SPEED_SCALE * SPEED_SCALE)
 
   #define FLYING_SPEED (running_speed * 2.0)
   #define FLYING_ACCELERATION (3.0 * 2.0 * 2.0)
@@ -439,7 +431,6 @@ void player_movement() {
   #define FAST_FLYING_ACCELERATION (FAST_FLYING_MULTIPLIER * FLYING_SPEED)
 
   if (!player_fly) {
-//    if ((glfwGetKey(GLFW_KEY_LSHIFT) || glfwGetKey(GLFW_KEY_RSHIFT)) == option_always_run) {
     if (controls_get_key (CONTROLS_KEY_RUN) == option_always_run) {
       speed = WALKING_SPEED;
       acceleration = ACCELERATION;
@@ -534,22 +525,6 @@ void player_movement() {
       math_reverse_rotate_vector(&player_velocity);
 
       double power = pow(viscosity, 2.0);
-
-      if (!player_fly) {
-        static int foot = 0;
-        static struct double_xyzuv foot_position;
-        struct double_xyz diff;
-        diff.x = player_position.x - foot_position.x;
-        diff.y = player_position.y - foot_position.y;
-        diff.z = player_position.z - foot_position.z;
-
-        double distance = fabs(sqrt(diff.x * diff.x + diff.y * diff.y));
-
-        if (distance >= stride / map_data.resolution.z && player_velocity.z == 0) {
-          sound_play (SOUND_WALK, 0.1f, NULL);
-          foot_position = player_position;
-        }
-      }
 
       if (player_fly || gravity_test(player_position.x, player_position.y, player_position.z) < 0.05) {
         // decelerate in directions orthogonal to player acceleration
@@ -720,6 +695,23 @@ void player_movement() {
         #endif
       };
 
+    };
+
+    if (gravity_test(player_position.x, player_position.y, player_position.z) < 0.05) {
+      static struct double_xyzuv foot_position;
+      struct double_xyz diff;
+      diff.x = (player_position.x - foot_position.x) * map_data.resolution.x;
+      diff.y = (player_position.y - foot_position.y) * map_data.resolution.y;
+      diff.z = (player_position.z - foot_position.z) * map_data.resolution.z;
+
+      double distance = sqrt(diff.x * diff.x + diff.y * diff.y);
+      double speed = sqrt(player_velocity.x * player_velocity.x + player_velocity.y * player_velocity.y);
+      double threshold = STRIDE_WALK + (STRIDE_RUN - STRIDE_WALK) * (speed - walking_speed) / (running_speed - walking_speed);
+
+      if (distance >= threshold) {
+        sound_play (SOUND_WALK, 0.2f, NULL);
+        foot_position = player_position;
+      };
     };
 
   };

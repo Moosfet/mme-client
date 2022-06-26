@@ -85,6 +85,8 @@ void menus_anaglyph() {
   };
 
   line++;
-  if (gui_check(4, line, &option_anaglyph_enable, 1, "Enable 3D Anaglyph Mode according to the above information.")) apply(), texture_rebind();
+  if (gui_radio(4, line++, &option_anaglyph_enable, 1, "Enable 3D Anaglyph Mode according to the above information.")) apply(), texture_rebind();
+  if (gui_radio(4, line++, &option_anaglyph_enable, 2, "Do something else even more ridiculous.")) apply(), texture_rebind();
+  if (gui_radio(4, line++, &option_anaglyph_enable, 0, "Oh no!  Turn it off!  I'm going to puke!")) apply(), texture_rebind();
 
 };

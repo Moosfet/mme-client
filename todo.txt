@@ -1,10 +1,12 @@
 short-term:
 
+  finish making mode keys configurable
+  lights aren't b&w in anaglyph mode
+  better mouse settings
   network error messages
-  is anaglyph mode working correctly?
-  cursor outside of game window when captured
   add descent-like flying
   make all the menus smaller
+  larger chunks?
 
 long-term:
 

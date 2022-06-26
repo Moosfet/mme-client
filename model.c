@@ -169,9 +169,9 @@ void model_render() {
 
       glEnable(GL_TEXTURE_2D);
       if (model_player[i].texture >= 0) {
-        glCallList(texture_list_base + model_player[i].texture + option_anaglyph_enable);
+        glCallList(texture_list_base + model_player[i].texture + RENDER_IN_GRAYSCALE);
       } else {
-        glBindTexture(GL_TEXTURE_2D, default_texture + option_anaglyph_enable);
+        glBindTexture(GL_TEXTURE_2D, default_texture + RENDER_IN_GRAYSCALE);
       };
       glColor3f(1.0, 1.0, 1.0);
       glEnable(GL_ALPHA_TEST);

@@ -15,12 +15,12 @@ void on_program_start(int argc, char **argv) {
   printf("Multiplayer Map Editor\n");
   printf("SVN revision %s\n", build_svn_string);
   printf("Compiled %s for %s\n", build_compile_date, build_target);
-FUCK
+
   backtrace_initialize();
-FUCK
+
   memory_initialize();
   cpu_initialize();
-FUCK
+
   argument_check(argc, argv);
 
   #ifdef UNIX

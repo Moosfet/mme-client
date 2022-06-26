@@ -316,10 +316,10 @@ static void draw_selection() {
   for (int s = 0; s < 2; s++) {
 
     if (s == 0) {
-      glBindTexture(GL_TEXTURE_2D, texture_half_screen + option_anaglyph_enable);
+      glBindTexture(GL_TEXTURE_2D, texture_half_screen + RENDER_IN_GRAYSCALE);
       glFrontFace(GL_CW);
     } else {
-      glBindTexture(GL_TEXTURE_2D, texture_full_screen + option_anaglyph_enable);
+      glBindTexture(GL_TEXTURE_2D, texture_full_screen + RENDER_IN_GRAYSCALE);
       glFrontFace(GL_CCW);
     };
 
@@ -385,7 +385,7 @@ static void use_map_coordinates(int eye) {
     use_incorrect_perspective = 1;
   } else {
     map_perspective_angle = 2.0 * atan(0.5 * display_window_height * option_anaglyph_pixel_size / option_anaglyph_distance) * 180 / M_PI;
-    printf("dts=%0.1f  sop=%0.3f  vs=%0.1f  angle=%0.3f\n", option_anaglyph_distance, option_anaglyph_pixel_size, display_window_height * option_anaglyph_pixel_size, map_perspective_angle);
+    //printf("dts=%0.1f  sop=%0.3f  vs=%0.1f  angle=%0.3f\n", option_anaglyph_distance, option_anaglyph_pixel_size, display_window_height * option_anaglyph_pixel_size, map_perspective_angle);
   };
 
   {
@@ -443,9 +443,18 @@ static void use_map_coordinates(int eye) {
     double scale = 0.01;
     if (option_anaglyph_units) scale /= 2.54;
     double offset = 0.5 * scale * option_pupil_distance;
+    double center = 0.5 * display_window_width;
     if (eye == 1) {
+      if (option_anaglyph_enable == 2) {
+        glScissor(0, 0, 0.5 * display_window_width, display_window_height);
+        glEnable(GL_SCISSOR_TEST);
+      };
       glTranslated(+offset, 0.0, 0.0);
     } else if (eye == 2) {
+      if (option_anaglyph_enable == 2) {
+        glScissor(0.5 * display_window_width, 0, display_window_width, display_window_height);
+        glEnable(GL_SCISSOR_TEST);
+      };
       glTranslated(-offset, 0.0, 0.0);
     };
   };
@@ -1965,14 +1974,56 @@ void map_render() {
 
   int do_anaglyph = option_anaglyph_enable && option_pupil_distance > 0.0;
 
+  int r_mask = 1, g_mask = 1, b_mask = 1;
+
   if (do_anaglyph) {
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-    glClear(GL_COLOR_BUFFER_BIT);
+    if (RENDER_IN_GRAYSCALE) {
+      r_mask = g_mask = b_mask = 0;
+      r_mask |= ((int []) {1, 1, 0, 0, 0, 1})[option_anaglyph_filter[0]];
+      g_mask |= ((int []) {0, 1, 1, 1, 0, 0})[option_anaglyph_filter[0]];
+      b_mask |= ((int []) {0, 0, 0, 1, 1, 1})[option_anaglyph_filter[0]];
+      r_mask |= ((int []) {1, 1, 0, 0, 0, 1})[option_anaglyph_filter[1]];
+      g_mask |= ((int []) {0, 1, 1, 1, 0, 0})[option_anaglyph_filter[1]];
+      b_mask |= ((int []) {0, 0, 0, 1, 1, 1})[option_anaglyph_filter[1]];
+    };
+  };
+
+  if ((option_fog_type & 1) == 0) {
+    glClearColor(0.05 * r_mask, 0.05 * g_mask, 0.05 * b_mask, 1.0);
+    glFogfv(GL_FOG_COLOR, (GLfloat[]) {0.05 * r_mask, 0.05 * g_mask, 0.05 * b_mask, 1.0});
+  } else if (RENDER_IN_GRAYSCALE) {
+    glClearColor(0.8 * r_mask, 0.8 * g_mask, 0.8 * b_mask, 1.0);
+    glFogfv(GL_FOG_COLOR, (GLfloat[]) {0.8 * r_mask, 0.8 * g_mask, 0.8 * b_mask, 1.0});
+  } else if (option_fog_type == 1) {
+    glClearColor(0.6 * r_mask, 0.8 * g_mask, 1.0 * b_mask, 1.0);
+    glFogfv(GL_FOG_COLOR, (GLfloat[]) {0.6 * r_mask, 0.8 * g_mask, 1.0 * b_mask, 1.0});
+  } else {
+    glClearColor(0.75 * r_mask, 0.8 * g_mask, 0.85 * b_mask, 1.0);
+    glFogfv(GL_FOG_COLOR, (GLfloat[]) {0.75 * r_mask, 0.8 * g_mask, 0.85 * b_mask, 1.0});
+  };
+
+  glClear(GL_COLOR_BUFFER_BIT);
+
+  int sucky_fog = 0;
+  if (option_fog_type & 2) {
+    glEnable(GL_FOG);
+    glFogi(GL_FOG_MODE, GL_LINEAR);
+    if (option_fog_type & 4) {
+      glFogf(GL_FOG_START, 0.5 * statistics_fog_distance);
+    } else {
+      glFogf(GL_FOG_START, 0.0 * statistics_fog_distance);
+    };
+    glFogf(GL_FOG_END, 1.0 * statistics_fog_distance);
+    glHint(GL_FOG_HINT, GL_NICEST);
+    glFogi(0x855A, 0x855B); // get better fog rendering on NVIDIA cards
+    sucky_fog = glGetError(); // ignore GL errors if it isn't available
+  } else {
+    glDisable(GL_FOG);
   };
 
   for (int eye = (do_anaglyph ? 1 : 0); eye < (do_anaglyph ? 3 : 1); eye++) {
-    int r_mask = 1, g_mask = 1, b_mask = 1;
-    if (eye) {
+    //int r_mask = 1, g_mask = 1, b_mask = 1;
+    if (eye && option_anaglyph_enable == 1) {
       r_mask = ((int []) {1, 1, 0, 0, 0, 1})[option_anaglyph_filter[eye - 1]];
       g_mask = ((int []) {0, 1, 1, 1, 0, 0})[option_anaglyph_filter[eye - 1]];
       b_mask = ((int []) {0, 0, 0, 1, 1, 1})[option_anaglyph_filter[eye - 1]];
@@ -1980,17 +2031,6 @@ void map_render() {
 
     glColorMask(r_mask ? GL_TRUE : GL_FALSE, g_mask ? GL_TRUE : GL_FALSE, b_mask ? GL_TRUE : GL_FALSE, GL_TRUE);
 
-    if (option_fog_type == 1) {
-      glClearColor(0.6 * r_mask, 0.8 * g_mask, 1.0 * b_mask, 1.0);
-    } else {
-      if ((option_fog_type & 1) == 0) {
-        glClearColor(0.05 * r_mask, 0.05 * g_mask, 0.05 * b_mask, 1.0);
-      } else {
-        glClearColor(0.75 * r_mask, 0.8 * g_mask, 0.85 * b_mask, 1.0);
-      };
-    };
-
-    glClear(GL_COLOR_BUFFER_BIT);
     glClear(GL_DEPTH_BUFFER_BIT);
     use_map_coordinates(eye); CHECK_GL_ERROR;
 
@@ -1998,28 +2038,6 @@ void map_render() {
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-
-    int sucky_fog = 0;
-    if (option_fog_type & 2) {
-      glEnable(GL_FOG);
-      if (option_fog_type & 1) {
-        glFogfv(GL_FOG_COLOR, (GLfloat[]) {0.75, 0.8, 0.85, 1.0});
-      } else {
-        glFogfv(GL_FOG_COLOR, (GLfloat[]) {0.05, 0.05, 0.05, 0.0});
-      };
-      glFogi(GL_FOG_MODE, GL_LINEAR);
-      if (option_fog_type & 4) {
-        glFogf(GL_FOG_START, 0.5 * statistics_fog_distance);
-      } else {
-        glFogf(GL_FOG_START, 0.0 * statistics_fog_distance);
-      };
-      glFogf(GL_FOG_END, 1.0 * statistics_fog_distance);
-      glHint(GL_FOG_HINT, GL_NICEST);
-      glFogi(0x855A, 0x855B); // get better fog rendering on NVIDIA cards
-      sucky_fog = glGetError(); // ignore GL errors if it isn't available
-    } else {
-      glDisable(GL_FOG);
-    };
 
     struct double_xyzuv pp = player_view;
     if (map_data.wrap.x && pp.x >= map_data.dimension.x / 2) pp.x -= map_data.dimension.x;
@@ -2340,9 +2358,10 @@ void map_render() {
     printf("%s", buffer);
     #endif
 
-    glDisable(GL_FOG);
     glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
 
+    #if 0
     glPushMatrix();
 
     // Slightly back away from the scene, so that we can draw on top of it.
@@ -2355,16 +2374,17 @@ void map_render() {
     t.y = v.x * sin(player_view.u) + v.y * cos(player_view.u);
     v.x = t.x; v.y = t.y;
     glTranslated(-1.0/64 * v.x, -1.0/64 * v.y, -1.0/64 * v.z);
+    #endif
 
     draw_selection();
 
     draw_cursor();
 
-    glPopMatrix();
-
-    glDisable(GL_DEPTH_TEST);
+    //glPopMatrix();
 
   };
   glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+  glDisable(GL_SCISSOR_TEST);
+  glDisable(GL_FOG);
 
 };

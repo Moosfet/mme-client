@@ -773,13 +773,7 @@ void menus_play() {
         instruction = "Click the block you want to become the block you build when pasting.";
       };
       if (mode == 4 && (option_key_input[CONTROLS_KEY_BLOCK_CREATE][0] != 0 || option_key_input[CONTROLS_KEY_BLOCK_CREATE][1] != 0)) {
-//        char *click = NULL;
         char *repeat = NULL;
-//        if (option_mouse_reverse) {
-//          click = "Right";
-//        } else {
-//          click = "Left";
-//        };
         if (option_multiple_paste) {
           repeat = "2 to return to building normally";
         } else {
@@ -915,9 +909,11 @@ void menus_play() {
       for (int eye = (option_anaglyph_enable ? 1 : 0); eye < (option_anaglyph_enable ? 3 : 1); eye++) {
         int r_mask = 1, g_mask = 1, b_mask = 1;
         if (eye) {
-          r_mask = ((int []) {1, 1, 0, 0, 0, 1})[option_anaglyph_filter[eye - 1]];
-          g_mask = ((int []) {0, 1, 1, 1, 0, 0})[option_anaglyph_filter[eye - 1]];
-          b_mask = ((int []) {0, 0, 0, 1, 1, 1})[option_anaglyph_filter[eye - 1]];
+          if (RENDER_IN_GRAYSCALE) {
+            r_mask = ((int []) {1, 1, 0, 0, 0, 1})[option_anaglyph_filter[eye - 1]];
+            g_mask = ((int []) {0, 1, 1, 1, 0, 0})[option_anaglyph_filter[eye - 1]];
+            b_mask = ((int []) {0, 0, 0, 1, 1, 1})[option_anaglyph_filter[eye - 1]];
+          };
           double scale = 0.01;
           if (option_anaglyph_units) scale /= 2.54;
           double pupil_offset_meters = 0.5 * scale * option_pupil_distance;

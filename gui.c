@@ -192,13 +192,13 @@ int gui_window(int x, int y, int flags) {
     glEnable(GL_TEXTURE_2D);
     glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    glBindTexture(GL_TEXTURE_2D, background + option_anaglyph_enable);
+    glBindTexture(GL_TEXTURE_2D, background + RENDER_IN_GRAYSCALE);
     glColor4f(0.5, 0.5, 0.5, 0.8);
     glBegin(GL_QUADS);
     texture_quad(-tx, -ty, +tx, +ty, ps - extra_x, pt - extra_y, pu + extra_x, pv + extra_y);
     glEnd();
 
-    glBindTexture(GL_TEXTURE_2D, widgets + option_anaglyph_enable);
+    glBindTexture(GL_TEXTURE_2D, widgets + RENDER_IN_GRAYSCALE);
 
     glColor3f(1.0, 1.0, 1.0);
     glBegin(GL_QUADS);
@@ -291,9 +291,9 @@ void gui_draw_text(int column, int row, char *string, char *colors, int flags) {
     double fx, fy;
 
     if (option_blender_font) {
-      glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, new_letters + option_anaglyph_enable);
+      glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, new_letters + RENDER_IN_GRAYSCALE);
     } else {
-      glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, old_letters + option_anaglyph_enable);
+      glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, old_letters + RENDER_IN_GRAYSCALE);
     };
     if (flags < 0) {
       glEnable(GL_ALPHA_TEST); glAlphaFunc(GL_GEQUAL, 0.75);
@@ -408,7 +408,7 @@ int gui_button(int x, int y, int w, char *string, int flags) {
   if (menu_draw_widget) {
 
     if (drawdown) {
-      glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, widgets + option_anaglyph_enable);
+      glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, widgets + RENDER_IN_GRAYSCALE);
       glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
       COLOR_TOUCH;
       glBegin(GL_QUADS);
@@ -453,7 +453,7 @@ int gui_button(int x, int y, int w, char *string, int flags) {
       };
       glPopMatrix();
     } else {
-      glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, widgets + option_anaglyph_enable);
+      glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, widgets + RENDER_IN_GRAYSCALE);
       glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
       if (hoverglow || menu_focus_object == menu_object_index) {
         COLOR_HOVER;
@@ -580,7 +580,7 @@ int gui_radio(int x, int y, int *p, int v, char *string) {
 
   if (menu_draw_widget) {
 
-    glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, widgets + option_anaglyph_enable);
+    glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, widgets + RENDER_IN_GRAYSCALE);
     glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glColor3f(0.0, 0.8, 0.0);
     glBegin(GL_QUADS);
@@ -689,7 +689,7 @@ int gui_check(int x, int y, int *p, int v, char *string) {
 
   if (menu_draw_widget) {
 
-    glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, widgets + option_anaglyph_enable);
+    glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, widgets + RENDER_IN_GRAYSCALE);
     glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glColor3f(0.0, 0.8, 0.0);
     glBegin(GL_QUADS);
@@ -930,7 +930,7 @@ int gui_input(int x, int y, int size, int length, char *string, int flags) {
     glEnd();
     #undef extra
 
-    glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, widgets + option_anaglyph_enable);
+    glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, widgets + RENDER_IN_GRAYSCALE);
     glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     if (menu_focus_object == menu_object_index || hoverglow) {
@@ -1131,7 +1131,7 @@ void gui_texture(int column, int line, int width, int height, int texture, doubl
   int pv = pt + pixel_height;
 
   glEnable(GL_TEXTURE_2D);
-  glCallList(texture_list_base + texture + option_anaglyph_enable);
+  glCallList(texture_list_base + texture + RENDER_IN_GRAYSCALE);
 
   //printf("Rendering menu texture with alpha = %f\n", texture_data[texture].alpha);
   if (texture_data[texture].alpha >= 1) {
@@ -1210,7 +1210,7 @@ void gui_draw_block (int block_type, int column, int line, int width, int height
       glEnable(GL_ALPHA_TEST);
       glAlphaFunc(GL_GEQUAL, texture_data[block_data[block_type].index[BLOCK_SIDE_UP]].alpha);
     };
-    glBindTexture(GL_TEXTURE_2D, texture_data[block_data[block_type].index[BLOCK_SIDE_UP]].name + option_anaglyph_enable);
+    glBindTexture(GL_TEXTURE_2D, texture_data[block_data[block_type].index[BLOCK_SIDE_UP]].name + RENDER_IN_GRAYSCALE);
     glBegin(GL_QUADS);
     glTexCoord2f(TC1, TC1);        glVertex2f(X0, Y0);
     glTexCoord2f(TC1, TC2);        glVertex2f(X1 , Y1);
@@ -1230,7 +1230,7 @@ void gui_draw_block (int block_type, int column, int line, int width, int height
       glAlphaFunc(GL_GEQUAL, texture_data[block_data[block_type].index[BLOCK_SIDE_UP]].alpha);
     };
     glColor3f(0.8, 0.8, 0.8);
-    glBindTexture(GL_TEXTURE_2D, texture_data[block_data[block_type].index[BLOCK_SIDE_FRONT]].name + option_anaglyph_enable);
+    glBindTexture(GL_TEXTURE_2D, texture_data[block_data[block_type].index[BLOCK_SIDE_FRONT]].name + RENDER_IN_GRAYSCALE);
     glBegin(GL_QUADS);
     glTexCoord2f(TC0, TC0);        glVertex2f(X4, Y4);
     glTexCoord2f(TC1, 0);          glVertex2f(X5, Y5);
@@ -1250,7 +1250,7 @@ void gui_draw_block (int block_type, int column, int line, int width, int height
       glAlphaFunc(GL_GEQUAL, texture_data[block_data[block_type].index[BLOCK_SIDE_RIGHT]].alpha);
     };
     glColor3f(0.6, 0.6, 0.6);
-    glBindTexture(GL_TEXTURE_2D, texture_data[block_data[block_type].index[BLOCK_SIDE_RIGHT]].name + option_anaglyph_enable);
+    glBindTexture(GL_TEXTURE_2D, texture_data[block_data[block_type].index[BLOCK_SIDE_RIGHT]].name + RENDER_IN_GRAYSCALE);
     glBegin(GL_QUADS);
     glTexCoord2f(TC1, TC0);         glVertex2f(X5, Y5);
     glTexCoord2f(TC2, TC0);         glVertex2f(X6, Y6);

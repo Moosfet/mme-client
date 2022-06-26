@@ -34,6 +34,8 @@ void glfw_capture_mouse() {
     if (glfwRawMouseMotionSupported()) glfwSetInputMode(glfw_window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
     glfwSetInputMode(glfw_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   };
+  event_mouse_ignore_counter = 1;
+  //glfwGetCursorPos(glfw_window, &event_mouse_position_x, &event_mouse_position_y);
 };
 
 //--page-split-- glfw_release_mouse
@@ -136,8 +138,8 @@ void glfw_open_window() {
   glfwWindowHint(GLFW_SRGB_CAPABLE, GL_TRUE);
   glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
 
-  if (option_fsaa_samples) {
-    glfwWindowHint(GLFW_SAMPLES, 4);
+  if (option_msaa_samples > 1) {
+    glfwWindowHint(GLFW_SAMPLES, option_msaa_samples);
   } else {
     glfwWindowHint(GLFW_SAMPLES, 0);
   };
@@ -188,7 +190,7 @@ void glfw_open_window() {
 
   glfw_mouse_capture_flag = 0;
 
-  if (option_fsaa_samples) {
+  if (option_msaa_samples) {
     //glEnable(GL_MULTISAMPLE);
     // this shit seems to be broken
     //void glMinSampleShading(GLfloat value);
@@ -208,6 +210,7 @@ void glfw_open_window() {
   glfwSwapInterval(!!option_request_vertical_sync);
 
   glfw_fullscreen(option_fullscreen);
+
 };
 
 //--page-split-- glfw_close_window

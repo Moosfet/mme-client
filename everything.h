@@ -157,6 +157,8 @@ struct int_xyzs {
   #define lag_pop()
 #endif
 
+#define RENDER_IN_GRAYSCALE (option_anaglyph_enable == 1)
+
 //--page-split-- global variables & function prototypes
 
 // alsa.h
@@ -334,9 +336,10 @@ const char *error_string(int error_code);
 #define EVENT_LIST_SIZE 1024
 
 extern int event_mouse_button_state;
-extern char event_key_state[530];
+extern char event_key_state[CONTROLS_MOUSE_KEY_LIMIT];
 extern int event_list[EVENT_LIST_SIZE][5];
 extern int event_list_index;
+extern int event_mouse_ignore_counter;
 int event_translate_from_unicode(int character);
 void event_open_window();
 void event_receive();
@@ -621,7 +624,6 @@ void menus_autofog();
 void menus_chat_scroll_reset();
 void menus_chat();
 void menus_controls();
-void menus_controls_key_select ();
 void menus_escape();
 void menus_exit_immediately();
 void menus_exit();
@@ -750,7 +752,7 @@ extern int option_window_width;
 extern int option_window_height;
 extern int option_window_location;
 extern int option_remember_size;
-extern int option_fsaa_samples;
+extern int option_msaa_samples;
 extern int option_multiple_paste;
 extern int option_custom_fps;
 extern int option_hyper_help;

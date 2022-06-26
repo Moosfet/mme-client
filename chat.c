@@ -257,7 +257,7 @@ void chat_color(int color) {
 
   };
 
-  if (option_anaglyph_enable) {
+  if (RENDER_IN_GRAYSCALE) {
     double v = (r + g + b) / 3.0;
     r = g = b = v;
   };

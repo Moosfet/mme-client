@@ -1388,7 +1388,7 @@ int server_paste(struct int_xyz lower_corner, struct int_xyz dimension, char *da
       compressed_size = allocation_size - stream.avail_out;
     } while (result != Z_STREAM_END);
     deflateEnd(&stream);
-    if (0 && compressed_size < 65535 - 12) {
+    if (compressed_size < 65535 - 12) {
       printf("Pasting via PACKET_MAP_DATA (data size is %d bytes)...\n", compressed_size);
       packet_send(PACKET_MAP_DATA, output_lower_corner, output_upper_corner, compressed_size, compressed_data);
       paste_successful = 1;
@@ -1407,7 +1407,7 @@ int server_paste(struct int_xyz lower_corner, struct int_xyz dimension, char *da
     memory_allocate(&compressed_data, 0);
   };
 
-  // Send one block at a time, if previous attempt failed.
+  // Send one block at a time, if previous methods weren't possible.
   if (!paste_successful) {
     int dx = (output_upper_corner.x - output_lower_corner.x + 1);
     int dy = (output_upper_corner.y - output_lower_corner.y + 1);

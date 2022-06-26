@@ -7,7 +7,7 @@ void menus_graphics() {
   int small_blocks = map_data.resolution.x < 0.1625;
 
   if (menu_process_event && KEY_PRESS_EVENT && KEY == GLFW_KEY_ESCAPE) menu_switch(menus_escape);
-  if (gui_window(54, 20, 3)) menu_switch(menus_play);
+  if (gui_window(54, 22, 3)) menu_switch(menus_play);
 
   gui_text(1, 0, "Graphics Options");
 
@@ -42,9 +42,16 @@ void menus_graphics() {
 
   gui_check(4, 13, &option_blender_font, 1, "Use a smoother but somewhat harder to read font.");
 
-  if (gui_check(4, 15, &option_fsaa_samples, 1, "Antialiasing (higher quality, lower FPS)")) {
+  gui_text(1, 15, "MSAA samples: (higher quality, lower FPS)");
+  int change = 0;
+  change |= gui_radio(4, 16, &option_msaa_samples, 1, "disabled");
+  change |= gui_radio(4, 17, &option_msaa_samples, 4, "enabled");
+  change |= gui_radio(4, 18, &option_msaa_samples, 9, "crazy");
+  change |= gui_radio(4, 19, &option_msaa_samples, 16, "insane");
+  if (change) {
     glfw_close_window();
     glfw_open_window();
   };
+  gui_text(1, 20, "This option closes and re-opens the game window.");
 
 };
