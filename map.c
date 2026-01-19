@@ -5,7 +5,7 @@ int map_chunk_bits = 5;
 #define CHUNK_RING_SIZE 4  // buffered chunks per thread, 4 is all we need
 
 struct structure_chunk_thread_data {
-  int kill_switch;
+  struct easy_thread_state thread_state;
   int read_index;
   int write_index;
   int chunk_index[CHUNK_RING_SIZE];
@@ -65,12 +65,7 @@ static int quad_count;
 static struct structure_chunk_thread_data *chunk_thread_data;
 volatile static char bullshit[1024];
 
-// MUTEX chunk_map_mutex;
-#ifdef WINDOWS
-static HANDLE chunk_map_mutex;
-#else
 static pthread_mutex_t chunk_map_mutex;
-#endif
 
 int map_chunk_thread_count = 0;
 
@@ -102,7 +97,7 @@ static const struct int_st *area;
 //--page-split-- map_initialize
 
 void map_initialize() {
-  MUTEX_INIT(chunk_map_mutex);
+  easy_mutex_init(&chunk_map_mutex, NULL);
 };
 
 //--page-split-- map_open_window
@@ -115,6 +110,835 @@ void map_open_window() {
 
 void map_close_window() {
   map_cease_render();
+};
+
+//--page-split-- compile_chunk
+
+static void compile_chunk(struct int_xyz chunk, struct structure_render_list **real_list, int *list_size) {
+
+  lag_push(100, "compile_chunk()");
+
+  // Figure out lighting...
+
+  int light_flag = 0;
+  if (option_lighting) {
+    if (map_data.resolution.x < 0.1625) {
+      if (option_lighting == 2) light_flag = 1;
+    } else if (map_data.resolution.x < 1.0 / 3.0) {
+      light_flag = 2;
+    } else {
+      light_flag = 3;
+    };
+  };
+
+  #define LD light_distance
+  #define SD short_distance
+  #define EC extra_chunks
+
+  #define CC (2 * EC + 1)          // chunk count (one dimension) of light area
+  #define BC (CC * chunk_size)     // block count of the same
+  #define BL (CC * chunk_size - 1) // one less?  why does this need a #define?
+
+  int light_distance;
+  int short_distance;
+  int extra_chunks;
+
+  if (light_flag == 1) {
+    light_distance = 64;
+    short_distance = 32;
+    extra_chunks = ceil(1.0 * light_distance / chunk_size);
+  } else if (light_flag == 2) {
+    light_distance = 32;
+    short_distance = 16;
+    extra_chunks = ceil(1.0 * light_distance / chunk_size);
+  } else {
+    light_distance = 16;
+    short_distance = 8;
+    extra_chunks = ceil(1.0 * light_distance / chunk_size);
+  };
+
+  char *b = NULL;
+  char *l = NULL;
+  #define B(x,y,z) *(b + ((z) * BC + (y)) * BC + (x))
+  #define L(x,y,z) *(l + ((z) * BC + (y)) * BC + (x))
+  struct int_xyz *this = NULL;
+  struct int_xyz *next = NULL;
+  struct int_xyz *temp;
+  #define LIST_INCREMENT 65536
+  int this_size = LIST_INCREMENT;
+  int next_size = LIST_INCREMENT;
+  int temp_size;
+  if (light_flag) {
+    memory_allocate(&b, BC*BC*BC);
+    memset(b, 0, BC*BC*BC);
+    memory_allocate(&l, BC*BC*BC);
+    memset(l, 0, BC*BC*BC);
+    memory_allocate(&this, this_size * sizeof(struct int_xyz));
+    memory_allocate(&next, next_size * sizeof(struct int_xyz));
+    int this_i = 0;
+    int next_i = 0;
+    int ll = LD;
+    struct int_xyz a;
+
+    lag_push(1, "* filling array");
+    struct int_xyz c;
+    for (c.z = -EC; c.z <= +EC; c.z++) {
+      for (c.y = -EC; c.y <= +EC; c.y++) {
+        for (c.x = -EC; c.x <= +EC; c.x++) {
+          if (c.x + chunk.x < 0 || c.x + chunk.x >= chunk_dimension.x) continue;
+          if (c.y + chunk.y < 0 || c.y + chunk.y >= chunk_dimension.y) continue;
+          if (c.z + chunk.z < 0 || c.z + chunk.z >= chunk_dimension.z) continue;
+          char *base = map_data.block +
+            ((c.z + chunk.z) * chunk_size * map_data.dimension.y +
+            (c.y + chunk.y) * chunk_size) * map_data.dimension.x +
+            (c.x + chunk.x) * chunk_size;
+          for (int z = 0; z < chunk_size; z++) {
+            if ((chunk.z + c.z) * chunk_size + z >= map_data.dimension.z) break;
+            for (int y = 0; y < chunk_size; y++) {
+              memmove(
+                b + ((
+                  chunk_size * (c.z + EC) + z)
+                  * BC + (chunk_size * (c.y + EC) + y))
+                  * BC + chunk_size * (c.x + EC),
+                base + (z * map_data.dimension.y + y) * map_data.dimension.x,
+                chunk_size
+              );
+            };
+          };
+        };
+      };
+    };
+    lag_pop();
+
+    lag_push(1, "* finding sun 1");
+    if (option_fog_type & 1) {
+      memset(l + BL * BC * BC, LD, BC * BC);
+    } else {
+      memset(l + BL * BC * BC, 0, BC * BC);
+    };
+
+    {
+      a.z = BL;
+      struct int_xyz b;
+      b.z = chunk_size * chunk.z + a.z - chunk_size * EC;
+      if (b.z < map_data.dimension.z) {
+        int z_limit = chunk_size * chunk.z + 96;
+        for (a.y = 0; a.y < BC; a.y++) {
+          b.y = chunk_size * chunk.y + a.y - chunk_size * EC;
+          if (b.y < 0 || b.y >= map_data.dimension.y) continue;
+          for (a.x = 0; a.x < BC; a.x++) {
+            b.x = chunk_size * chunk.x + a.x - chunk_size * EC;
+            if (b.x < 0 || b.x >= map_data.dimension.x) continue;
+            char *base = map_data.block + (b.z * map_data.dimension.y + b.y) * map_data.dimension.x + b.x;
+            char *base_limit = map_data.block + (z_limit * map_data.dimension.y + b.y) * map_data.dimension.x + b.x;
+            if (base_limit > map_data.block + map_data.limit) base_limit = map_data.block + map_data.limit;
+            while (base < base_limit) {
+              int t = *base; base += map_data.dimension.x * map_data.dimension.y;
+              if (block_data[t].emission == 3) {
+                L(a.x, a.y, a.z) = LD;
+                break;
+              };
+              if (block_data[t].visible && !block_data[t].transparent) {
+                L(a.x, a.y, a.z) = 0;
+              };
+            };
+          };
+        };
+      };
+    };
+
+    lag_pop();
+
+    lag_push(1, "* sun flow");
+
+    for (int i = BC * BC * BC - 1; i >= BC * BC; i--) {
+      if (block_data[b[i]].emission == 3) l[i] = LD;
+      if (l[i] == LD) {
+        int j = i - BC * BC;
+        if (!block_data[b[j]].visible || block_data[b[j]].transparent) {
+          l[j] = LD;
+        };
+      };
+    };
+
+    lag_pop();
+
+    lag_push(1, "* finding sun 2");
+    #define CONDITION(x, y, z) (L(x,y,z) < ll - 1 && (!block_data[B(x,y,z)].visible || block_data[B(x,y,z)].transparent))
+    #define ACTION(x, y, z) L(x,y,z) = ll - 1, next[next_i++] = (struct int_xyz) {x, y, z}
+    #define CONDITION_A(x, y, z) (L(x,y,z) <= ll - 1 && (!block_data[B(x,y,z)].visible || block_data[B(x,y,z)].transparent))
+    #define CONDITION_B(x, y, z) (L(x,y,z) < ll - 1)
+    for (a.z = 0; a.z < BC; a.z++) {
+      for (a.y = 0; a.y < BC; a.y++) {
+        for (a.x = 0; a.x < BC; a.x++) {
+          if (L(a.x,a.y,a.z) == ll || block_data[B(a.x,a.y,a.z)].emission >= 2) {
+            if (a.y > 0 && CONDITION_A(a.x, a.y-1, a.z)) {
+              if (CONDITION_B(a.x, a.y-1, a.z)) ACTION(a.x, a.y-1, a.z);
+              if (a.x > 0 && CONDITION(a.x-1, a.y-1, a.z)) ACTION(a.x-1, a.y-1, a.z);
+              if (a.x < BL && CONDITION(a.x+1, a.y-1, a.z)) ACTION(a.x+1, a.y-1, a.z);
+              if (a.z > 0 && CONDITION(a.x, a.y-1, a.z-1)) ACTION(a.x, a.y-1, a.z-1);
+              if (a.z < BL && CONDITION(a.x, a.y-1, a.z+1)) ACTION(a.x, a.y-1, a.z+1);
+            };
+            if (a.y < BL && CONDITION_A(a.x, a.y+1, a.z)) {
+              if (CONDITION_B(a.x, a.y+1, a.z)) ACTION(a.x, a.y+1, a.z);
+              if (a.x > 0 && CONDITION(a.x-1, a.y+1, a.z)) ACTION(a.x-1, a.y+1, a.z);
+              if (a.x < BL && CONDITION(a.x+1, a.y+1, a.z)) ACTION(a.x+1, a.y+1, a.z);
+              if (a.z > 0 && CONDITION(a.x, a.y+1, a.z-1)) ACTION(a.x, a.y+1, a.z-1);
+              if (a.z < BL && CONDITION(a.x, a.y+1, a.z+1)) ACTION(a.x, a.y+1, a.z+1);
+            };
+            if (a.x > 0 && CONDITION_A(a.x-1, a.y, a.z)) {
+              if (CONDITION_B(a.x-1, a.y, a.z)) ACTION(a.x-1, a.y, a.z);
+              if (a.y > 0 && CONDITION(a.x-1, a.y-1, a.z)) ACTION(a.x-1, a.y-1, a.z);
+              if (a.y < BL && CONDITION(a.x-1, a.y+1, a.z)) ACTION(a.x-1, a.y+1, a.z);
+              if (a.z > 0 && CONDITION(a.x-1, a.y, a.z-1)) ACTION(a.x-1, a.y, a.z-1);
+              if (a.z < BL && CONDITION(a.x-1, a.y, a.z+1)) ACTION(a.x-1, a.y, a.z+1);
+            };
+            if (a.x < BL && CONDITION_A(a.x+1, a.y, a.z)) {
+              if (CONDITION_B(a.x+1, a.y, a.z)) ACTION(a.x+1, a.y, a.z);
+              if (a.y > 0 && CONDITION(a.x+1, a.y-1, a.z)) ACTION(a.x+1, a.y-1, a.z);
+              if (a.y < BL && CONDITION(a.x+1, a.y+1, a.z)) ACTION(a.x+1, a.y+1, a.z);
+              if (a.z > 0 && CONDITION(a.x+1, a.y, a.z-1)) ACTION(a.x+1, a.y, a.z-1);
+              if (a.z < BL && CONDITION(a.x+1, a.y, a.z+1)) ACTION(a.x+1, a.y, a.z+1);
+            };
+            if (a.z > 0 && CONDITION_A(a.x, a.y, a.z-1)) {
+              if (CONDITION_B(a.x, a.y, a.z-1)) ACTION(a.x, a.y, a.z-1);
+              if (a.x > 0 && CONDITION(a.x-1, a.y, a.z-1)) ACTION(a.x-1, a.y, a.z-1);
+              if (a.x < BL && CONDITION(a.x+1, a.y, a.z-1)) ACTION(a.x+1, a.y, a.z-1);
+              if (a.y > 0 && CONDITION(a.x, a.y-1, a.z-1)) ACTION(a.x, a.y-1, a.z-1);
+              if (a.y < BL && CONDITION(a.x, a.y+1, a.z-1)) ACTION(a.x, a.y+1, a.z-1);
+            };
+            if (a.z < BL && CONDITION_A(a.x, a.y, a.z+1)) {
+              if (CONDITION_B(a.x, a.y, a.z+1)) ACTION(a.x, a.y, a.z+1);
+              if (a.x > 0 && CONDITION(a.x-1, a.y, a.z+1)) ACTION(a.x-1, a.y, a.z+1);
+              if (a.x < BL && CONDITION(a.x+1, a.y, a.z+1)) ACTION(a.x+1, a.y, a.z+1);
+              if (a.y > 0 && CONDITION(a.x, a.y-1, a.z+1)) ACTION(a.x, a.y-1, a.z+1);
+              if (a.y < BL && CONDITION(a.x, a.y+1, a.z+1)) ACTION(a.x, a.y+1, a.z+1);
+            };
+          };
+          if (next_i > next_size - 27) {
+            next_size += LIST_INCREMENT;
+            memory_allocate(&next, next_size * sizeof(struct int_xyz));
+          };
+        };
+      };
+    };
+    lag_pop();
+
+    ll--;
+
+    #define DIAGONAL_CONDITION_X 1
+    #define DIAGONAL_CONDITION_Y 1
+    #define DIAGONAL_CONDITION_Z 1
+
+    lag_push(1, "* light flow");
+    while (ll >= 2) {
+      if (next_i == 0 && ll > SD) ll = SD;
+      if (next_i == 0 && ll < SD) break;
+      this_i = next_i; next_i = 0;
+      temp = this; this = next; next = temp;
+      temp_size = this_size; this_size = next_size; next_size = temp_size;
+      if (ll == SD) {
+        lag_push(1, "* finding lamps");
+        for (a.z = 0; a.z < BC; a.z++) {
+          for (a.y = 0; a.y < BC; a.y++) {
+            for (a.x = 0; a.x < BC; a.x++) {
+              if (L(a.x,a.y,a.z) == ll || block_data[B(a.x,a.y,a.z)].emission == 1) {
+                if (a.y > 0 && CONDITION_A(a.x, a.y-1, a.z)) {
+                  if (CONDITION_B(a.x, a.y-1, a.z)) ACTION(a.x, a.y-1, a.z);
+                  if (a.x > 0 && CONDITION(a.x-1, a.y-1, a.z)) ACTION(a.x-1, a.y-1, a.z);
+                  if (a.x < BL && CONDITION(a.x+1, a.y-1, a.z)) ACTION(a.x+1, a.y-1, a.z);
+                  if (a.z > 0 && CONDITION(a.x, a.y-1, a.z-1)) ACTION(a.x, a.y-1, a.z-1);
+                  if (a.z < BL && CONDITION(a.x, a.y-1, a.z+1)) ACTION(a.x, a.y-1, a.z+1);
+                };
+                if (a.y < BL && CONDITION_A(a.x, a.y+1, a.z)) {
+                  if (CONDITION_B(a.x, a.y+1, a.z)) ACTION(a.x, a.y+1, a.z);
+                  if (a.x > 0 && CONDITION(a.x-1, a.y+1, a.z)) ACTION(a.x-1, a.y+1, a.z);
+                  if (a.x < BL && CONDITION(a.x+1, a.y+1, a.z)) ACTION(a.x+1, a.y+1, a.z);
+                  if (a.z > 0 && CONDITION(a.x, a.y+1, a.z-1)) ACTION(a.x, a.y+1, a.z-1);
+                  if (a.z < BL && CONDITION(a.x, a.y+1, a.z+1)) ACTION(a.x, a.y+1, a.z+1);
+                };
+                if (a.x > 0 && CONDITION_A(a.x-1, a.y, a.z)) {
+                  if (CONDITION_B(a.x-1, a.y, a.z)) ACTION(a.x-1, a.y, a.z);
+                  if (a.y > 0 && CONDITION(a.x-1, a.y-1, a.z)) ACTION(a.x-1, a.y-1, a.z);
+                  if (a.y < BL && CONDITION(a.x-1, a.y+1, a.z)) ACTION(a.x-1, a.y+1, a.z);
+                  if (a.z > 0 && CONDITION(a.x-1, a.y, a.z-1)) ACTION(a.x-1, a.y, a.z-1);
+                  if (a.z < BL && CONDITION(a.x-1, a.y, a.z+1)) ACTION(a.x-1, a.y, a.z+1);
+                };
+                if (a.x < BL && CONDITION_A(a.x+1, a.y, a.z)) {
+                  if (CONDITION_B(a.x+1, a.y, a.z)) ACTION(a.x+1, a.y, a.z);
+                  if (a.y > 0 && CONDITION(a.x+1, a.y-1, a.z)) ACTION(a.x+1, a.y-1, a.z);
+                  if (a.y < BL && CONDITION(a.x+1, a.y+1, a.z)) ACTION(a.x+1, a.y+1, a.z);
+                  if (a.z > 0 && CONDITION(a.x+1, a.y, a.z-1)) ACTION(a.x+1, a.y, a.z-1);
+                  if (a.z < BL && CONDITION(a.x+1, a.y, a.z+1)) ACTION(a.x+1, a.y, a.z+1);
+                };
+                if (a.z > 0 && CONDITION_A(a.x, a.y, a.z-1)) {
+                  if (CONDITION_B(a.x, a.y, a.z-1)) ACTION(a.x, a.y, a.z-1);
+                  if (a.x > 0 && CONDITION(a.x-1, a.y, a.z-1)) ACTION(a.x-1, a.y, a.z-1);
+                  if (a.x < BL && CONDITION(a.x+1, a.y, a.z-1)) ACTION(a.x+1, a.y, a.z-1);
+                  if (a.y > 0 && CONDITION(a.x, a.y-1, a.z-1)) ACTION(a.x, a.y-1, a.z-1);
+                  if (a.y < BL && CONDITION(a.x, a.y+1, a.z-1)) ACTION(a.x, a.y+1, a.z-1);
+                };
+                if (a.z < BL && CONDITION_A(a.x, a.y, a.z+1)) {
+                  if (CONDITION_B(a.x, a.y, a.z+1)) ACTION(a.x, a.y, a.z+1);
+                  if (a.x > 0 && CONDITION(a.x-1, a.y, a.z+1)) ACTION(a.x-1, a.y, a.z+1);
+                  if (a.x < BL && CONDITION(a.x+1, a.y, a.z+1)) ACTION(a.x+1, a.y, a.z+1);
+                  if (a.y > 0 && CONDITION(a.x, a.y-1, a.z+1)) ACTION(a.x, a.y-1, a.z+1);
+                  if (a.y < BL && CONDITION(a.x, a.y+1, a.z+1)) ACTION(a.x, a.y+1, a.z+1);
+                };
+              };
+              if (next_i > next_size - 27) {
+                next_size += LIST_INCREMENT;
+                memory_allocate(&next, next_size * sizeof(struct int_xyz));
+              };
+            };
+          };
+        };
+        lag_pop();
+      } else {
+        for (int i = 0; i < this_i; i++) {
+          a = this[i];
+          if (L(a.x,a.y,a.z) == ll) {
+            if (a.y > 0 && CONDITION_A(a.x, a.y-1, a.z)) {
+              if (CONDITION_B(a.x, a.y-1, a.z)) ACTION(a.x, a.y-1, a.z);
+              if (a.x > 0 && CONDITION(a.x-1, a.y-1, a.z)) ACTION(a.x-1, a.y-1, a.z);
+              if (a.x < BL && CONDITION(a.x+1, a.y-1, a.z)) ACTION(a.x+1, a.y-1, a.z);
+              if (a.z > 0 && CONDITION(a.x, a.y-1, a.z-1)) ACTION(a.x, a.y-1, a.z-1);
+              if (a.z < BL && CONDITION(a.x, a.y-1, a.z+1)) ACTION(a.x, a.y-1, a.z+1);
+            };
+            if (a.y < BL && CONDITION_A(a.x, a.y+1, a.z)) {
+              if (CONDITION_B(a.x, a.y+1, a.z)) ACTION(a.x, a.y+1, a.z);
+              if (a.x > 0 && CONDITION(a.x-1, a.y+1, a.z)) ACTION(a.x-1, a.y+1, a.z);
+              if (a.x < BL && CONDITION(a.x+1, a.y+1, a.z)) ACTION(a.x+1, a.y+1, a.z);
+              if (a.z > 0 && CONDITION(a.x, a.y+1, a.z-1)) ACTION(a.x, a.y+1, a.z-1);
+              if (a.z < BL && CONDITION(a.x, a.y+1, a.z+1)) ACTION(a.x, a.y+1, a.z+1);
+            };
+            if (a.x > 0 && CONDITION_A(a.x-1, a.y, a.z)) {
+              if (CONDITION_B(a.x-1, a.y, a.z)) ACTION(a.x-1, a.y, a.z);
+              if (a.y > 0 && CONDITION(a.x-1, a.y-1, a.z)) ACTION(a.x-1, a.y-1, a.z);
+              if (a.y < BL && CONDITION(a.x-1, a.y+1, a.z)) ACTION(a.x-1, a.y+1, a.z);
+              if (a.z > 0 && CONDITION(a.x-1, a.y, a.z-1)) ACTION(a.x-1, a.y, a.z-1);
+              if (a.z < BL && CONDITION(a.x-1, a.y, a.z+1)) ACTION(a.x-1, a.y, a.z+1);
+            };
+            if (a.x < BL && CONDITION_A(a.x+1, a.y, a.z)) {
+              if (CONDITION_B(a.x+1, a.y, a.z)) ACTION(a.x+1, a.y, a.z);
+              if (a.y > 0 && CONDITION(a.x+1, a.y-1, a.z)) ACTION(a.x+1, a.y-1, a.z);
+              if (a.y < BL && CONDITION(a.x+1, a.y+1, a.z)) ACTION(a.x+1, a.y+1, a.z);
+              if (a.z > 0 && CONDITION(a.x+1, a.y, a.z-1)) ACTION(a.x+1, a.y, a.z-1);
+              if (a.z < BL && CONDITION(a.x+1, a.y, a.z+1)) ACTION(a.x+1, a.y, a.z+1);
+            };
+            if (a.z > 0 && CONDITION_A(a.x, a.y, a.z-1)) {
+              if (CONDITION_B(a.x, a.y, a.z-1)) ACTION(a.x, a.y, a.z-1);
+              if (a.x > 0 && CONDITION(a.x-1, a.y, a.z-1)) ACTION(a.x-1, a.y, a.z-1);
+              if (a.x < BL && CONDITION(a.x+1, a.y, a.z-1)) ACTION(a.x+1, a.y, a.z-1);
+              if (a.y > 0 && CONDITION(a.x, a.y-1, a.z-1)) ACTION(a.x, a.y-1, a.z-1);
+              if (a.y < BL && CONDITION(a.x, a.y+1, a.z-1)) ACTION(a.x, a.y+1, a.z-1);
+            };
+            if (a.z < BL && CONDITION_A(a.x, a.y, a.z+1)) {
+              if (CONDITION_B(a.x, a.y, a.z+1)) ACTION(a.x, a.y, a.z+1);
+              if (a.x > 0 && CONDITION(a.x-1, a.y, a.z+1)) ACTION(a.x-1, a.y, a.z+1);
+              if (a.x < BL && CONDITION(a.x+1, a.y, a.z+1)) ACTION(a.x+1, a.y, a.z+1);
+              if (a.y > 0 && CONDITION(a.x, a.y-1, a.z+1)) ACTION(a.x, a.y-1, a.z+1);
+              if (a.y < BL && CONDITION(a.x, a.y+1, a.z+1)) ACTION(a.x, a.y+1, a.z+1);
+            };
+          };
+          if (next_i > next_size - 27) {
+            next_size += LIST_INCREMENT;
+            memory_allocate(&next, next_size * sizeof(struct int_xyz));
+          };
+        };
+      };
+      ll--;
+    };
+    lag_pop();
+
+    memory_allocate(&this, 0);
+    memory_allocate(&next, 0);
+    memory_allocate(&b, 0);
+  };
+
+  // Create list of quads from block data...
+
+  int max_list_entries = 6 * chunk_size * chunk_size * chunk_size;
+  struct structure_render_list *the_list = NULL;
+  struct structure_render_list **render_list = &the_list;
+  memory_allocate(render_list, sizeof(struct structure_render_list) * max_list_entries);
+  *list_size = 0;
+
+  lag_push(100, "* reducing polygons");
+
+  struct int_xyz c, m, o;
+  // c = block coordinate within current chunk
+  // m = map coordinate of current block
+  // o = map coordinate of opposite block
+  int i, j, t;
+  int start = 1536;
+  int grid[chunk_size][chunk_size];
+  int light[chunk_size][chunk_size];
+  int grid_count;
+  for (int side = 0; side < 6; side++) {
+    int first_z = 0;
+    if (
+      (side == BLOCK_SIDE_UP && chunk.z == 0) || (side == BLOCK_SIDE_DOWN && chunk.z == chunk_dimension.z - 1) ||
+      (side == BLOCK_SIDE_BACK && chunk.y == 0) || (side == BLOCK_SIDE_FRONT && chunk.y == chunk_dimension.y - 1) ||
+      (side == BLOCK_SIDE_RIGHT && chunk.x == 0) || (side == BLOCK_SIDE_LEFT && chunk.x == chunk_dimension.x - 1)
+    ) {
+      first_z = -1;
+    };
+    for (c.z = first_z; c.z < chunk_size; c.z++) {
+    //for (c.z = chunk_size - 1; c.z >= 0; c.z--) {
+      grid_count = 0;
+      for (c.y = 0; c.y < chunk_size; c.y++) {
+        for (c.x = 0; c.x < chunk_size; c.x++) {
+
+          switch (side) {
+            case BLOCK_SIDE_UP:
+              m.x = (chunk.x << map_chunk_bits) + c.x; o.x = m.x;
+              m.y = (chunk.y << map_chunk_bits) + c.y; o.y = m.y;
+              m.z = (chunk.z << map_chunk_bits) + c.z; o.z = m.z + 1;
+            break;
+            case BLOCK_SIDE_FRONT:
+              m.x = (chunk.x << map_chunk_bits) + c.x; o.x = m.x;
+              m.y = (chunk.y << map_chunk_bits) - c.z + (1 << map_chunk_bits) - 1; o.y = m.y - 1;
+              m.z = (chunk.z << map_chunk_bits) + c.y; o.z = m.z;
+            break;
+            case BLOCK_SIDE_RIGHT:
+              m.x = (chunk.x << map_chunk_bits) + c.z; o.x = m.x + 1;
+              m.y = (chunk.y << map_chunk_bits) + c.x; o.y = m.y;
+              m.z = (chunk.z << map_chunk_bits) + c.y; o.z = m.z;
+            break;
+            case BLOCK_SIDE_LEFT:
+              m.x = (chunk.x << map_chunk_bits) - c.z + (1 << map_chunk_bits) - 1; o.x = m.x - 1;
+              m.y = (chunk.y << map_chunk_bits) - c.x + (1 << map_chunk_bits) - 1; o.y = m.y;
+              m.z = (chunk.z << map_chunk_bits) + c.y; o.z = m.z;
+            break;
+            case BLOCK_SIDE_BACK:
+              m.x = (chunk.x << map_chunk_bits) - c.x + (1 << map_chunk_bits) - 1; o.x = m.x;
+              m.y = (chunk.y << map_chunk_bits) + c.z; o.y = m.y + 1;
+              m.z = (chunk.z << map_chunk_bits) + c.y; o.z = m.z;
+            break;
+            case BLOCK_SIDE_DOWN:
+              m.x = (chunk.x << map_chunk_bits) + c.x; o.x = m.x;
+              m.y = (chunk.y << map_chunk_bits) - c.y + (1 << map_chunk_bits) - 1; o.y = m.y;
+              m.z = (chunk.z << map_chunk_bits) - c.z + (1 << map_chunk_bits) - 1; o.z = m.z - 1;
+            break;
+          };
+
+          i = map_get_block_type(m); // the block we are working on
+          j = map_get_block_type(o); // the block opposite this one
+          t = -1; // which texture we've decided to render here
+
+          // if the opposite block doesn't obstruct the view of this block
+          if (!block_data[j].visible || block_data[j].transparent) {
+            // if this block has visible textures
+            if (block_data[i].visible) {
+              // and it's a different block
+              if (i != j || block_data[i].between) {
+                t = block_data[i].index[side];
+              };
+            };
+          };
+
+          // if the opposite block has a reverse texture and we haven't chosen
+          // to draw a forward texture for this block, then draw the reverse texture
+          if (t == -1 && block_data[j].visible) {
+            if (block_data[j].reverse) {
+              if (i != j) {
+                t = block_data[j].index[5-side];
+              };
+            };
+          };
+
+          // Show invalid texture when block type zero is involved.
+          if (t >= 0 && (i == 0 || j == 0)) t = TEXTURE_NO_ZERO;
+
+          grid[c.x][c.y] = t;
+          if (light_flag) {
+            if (block_data[i].emission) {
+              light[c.x][c.y] = 255;
+            } else {
+              int t = L(o.x - chunk_size * chunk.x + chunk_size * EC, o.y - chunk_size * chunk.y + chunk_size * EC, o.z - chunk_size * chunk.z + chunk_size * EC);
+              //if (option_quantization && t < 64) t = 3 * ceil(t / 3.0);
+              light[c.x][c.y] = t;
+            };
+          } else {
+            light[c.x][c.y] = LD;
+          };
+          if (t >= 0) grid_count++;
+
+        };
+      };
+
+      // Reduce polygons here!
+
+      for (int a = 0; a < area_count && grid_count; a++) {
+        if (area[a].s > chunk_size || area[a].t > chunk_size) continue;
+        for (c.y = 0; c.y <= chunk_size - area[a].t; c.y++) {
+          for (c.x = 0; c.x <= chunk_size - area[a].s; c.x++) {
+            int texture = -2; int shade;
+            for (int v = c.y; v < c.y + area[a].t; v++) {
+              for (int u = c.x; u < c.x + area[a].s; u++) {
+                if (grid[u][v] == -1) goto NO_MATCH;
+                if (grid[u][v] >= 0) {
+                  if (texture == -2) {
+                    texture = grid[u][v];
+                    shade = light[u][v];
+                  };
+                  if (grid[u][v] != texture || light[u][v] != shade) goto NO_MATCH;
+                };
+              };
+            };
+            if (texture >= 0) {
+
+              #ifdef TEST
+              area_tally[a]++;
+              #endif
+
+              if (texture < start) start = texture;
+              (*render_list)[*list_size].index = texture;
+              (*render_list)[*list_size].side = side;
+              if (light[c.x][c.y] > LD) {
+                (*render_list)[*list_size].light = 2.0;
+              } else if (light[c.x][c.y] == LD) {
+                (*render_list)[*list_size].light = 1.0;
+              } else {
+                double l = light[c.x][c.y] / (double) LD;
+                l = pow(l, 1.2);
+                (*render_list)[*list_size].light = 0.05 + 0.7 * l;
+              };
+
+              #ifdef TEST
+              //  (*render_list)[*list_size].light = easy_random(255) / 255.0;
+              #endif
+
+              switch (side) {
+                case BLOCK_SIDE_UP:
+                  (*render_list)[*list_size].points[0].x = chunk_size * chunk.x + c.x;
+                  (*render_list)[*list_size].points[0].y = chunk_size * chunk.y + c.y;
+                  (*render_list)[*list_size].points[0].z = chunk_size * chunk.z + c.z + 1;
+                  (*render_list)[*list_size].points[1].x = chunk_size * chunk.x + c.x + area[a].s;
+                  (*render_list)[*list_size].points[1].y = chunk_size * chunk.y + c.y;
+                  (*render_list)[*list_size].points[1].z = chunk_size * chunk.z + c.z + 1;
+                  (*render_list)[*list_size].points[2].x = chunk_size * chunk.x + c.x + area[a].s;
+                  (*render_list)[*list_size].points[2].y = chunk_size * chunk.y + c.y + area[a].t;
+                  (*render_list)[*list_size].points[2].z = chunk_size * chunk.z + c.z + 1;
+                  (*render_list)[*list_size].points[3].x = chunk_size * chunk.x + c.x;
+                  (*render_list)[*list_size].points[3].y = chunk_size * chunk.y + c.y + area[a].t;
+                  (*render_list)[*list_size].points[3].z = chunk_size * chunk.z + c.z + 1;
+                  if (!option_textures) {
+                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x;
+                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x;
+                  } else if (texture_data[texture].x_scale >= 0) {
+                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x * texture_data[texture].x_scale * map_data.resolution.x;
+                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x * texture_data[texture].x_scale * map_data.resolution.x;
+                  } else {
+                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x * -texture_data[texture].x_scale;
+                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x * -texture_data[texture].x_scale;
+                  };
+                  if (!option_textures) {
+                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].y;
+                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].y;
+                  } else if (texture_data[texture].y_scale >= 0) {
+                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].y * texture_data[texture].y_scale * map_data.resolution.y;
+                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].y * texture_data[texture].y_scale * map_data.resolution.y;
+                  } else {
+                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].y * -texture_data[texture].y_scale;
+                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].y * -texture_data[texture].y_scale;
+                  };
+                break;
+                case BLOCK_SIDE_FRONT:
+                  (*render_list)[*list_size].points[0].x = chunk_size * chunk.x + c.x;
+                  (*render_list)[*list_size].points[0].y = chunk_size * chunk.y + chunk_size - c.z - 1;
+                  (*render_list)[*list_size].points[0].z = chunk_size * chunk.z + c.y;
+                  (*render_list)[*list_size].points[1].x = chunk_size * chunk.x + c.x + area[a].s;
+                  (*render_list)[*list_size].points[1].y = chunk_size * chunk.y + chunk_size - c.z - 1;
+                  (*render_list)[*list_size].points[1].z = chunk_size * chunk.z + c.y;
+                  (*render_list)[*list_size].points[2].x = chunk_size * chunk.x + c.x + area[a].s;
+                  (*render_list)[*list_size].points[2].y = chunk_size * chunk.y + chunk_size - c.z - 1;
+                  (*render_list)[*list_size].points[2].z = chunk_size * chunk.z + c.y + area[a].t;
+                  (*render_list)[*list_size].points[3].x = chunk_size * chunk.x + c.x;
+                  (*render_list)[*list_size].points[3].y = chunk_size * chunk.y + chunk_size - c.z - 1;
+                  (*render_list)[*list_size].points[3].z = chunk_size * chunk.z + c.y + area[a].t;
+                  if (!option_textures) {
+                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x;
+                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x;
+                  } else if (texture_data[texture].x_scale >= 0) {
+                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x * texture_data[texture].x_scale * map_data.resolution.x;
+                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x * texture_data[texture].x_scale * map_data.resolution.x;
+                  } else {
+                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x * -texture_data[texture].x_scale;
+                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x * -texture_data[texture].x_scale;
+                  };
+                  if (!option_textures) {
+                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z;
+                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z;
+                  } else if (texture_data[texture].y_scale >= 0) {
+                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z * texture_data[texture].y_scale * map_data.resolution.z;
+                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z * texture_data[texture].y_scale * map_data.resolution.z;
+                  } else {
+                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z * -texture_data[texture].y_scale;
+                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z * -texture_data[texture].y_scale;
+                  };
+                break;
+                case BLOCK_SIDE_RIGHT:
+                  (*render_list)[*list_size].points[0].x = chunk_size * chunk.x + c.z + 1;
+                  (*render_list)[*list_size].points[0].y = chunk_size * chunk.y + c.x;
+                  (*render_list)[*list_size].points[0].z = chunk_size * chunk.z + c.y;
+                  (*render_list)[*list_size].points[1].x = chunk_size * chunk.x + c.z + 1;
+                  (*render_list)[*list_size].points[1].y = chunk_size * chunk.y + c.x + area[a].s;
+                  (*render_list)[*list_size].points[1].z = chunk_size * chunk.z + c.y;
+                  (*render_list)[*list_size].points[2].x = chunk_size * chunk.x + c.z + 1;
+                  (*render_list)[*list_size].points[2].y = chunk_size * chunk.y + c.x + area[a].s;
+                  (*render_list)[*list_size].points[2].z = chunk_size * chunk.z + c.y + area[a].t;
+                  (*render_list)[*list_size].points[3].x = chunk_size * chunk.x + c.z + 1;
+                  (*render_list)[*list_size].points[3].y = chunk_size * chunk.y + c.x;
+                  (*render_list)[*list_size].points[3].z = chunk_size * chunk.z + c.y + area[a].t;
+                  if (!option_textures) {
+                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].y;
+                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].y;
+                  } else if (texture_data[texture].x_scale >= 0) {
+                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].y * texture_data[texture].x_scale * map_data.resolution.y;
+                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].y * texture_data[texture].x_scale * map_data.resolution.y;
+                  } else {
+                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].y * -texture_data[texture].x_scale;
+                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].y * -texture_data[texture].x_scale;
+                  };
+                  if (!option_textures) {
+                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z;
+                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z;
+                  } else if (texture_data[texture].y_scale >= 0) {
+                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z * texture_data[texture].y_scale * map_data.resolution.z;
+                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z * texture_data[texture].y_scale * map_data.resolution.z;
+                  } else {
+                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z * -texture_data[texture].y_scale;
+                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z * -texture_data[texture].y_scale;
+                  };
+                break;
+                case BLOCK_SIDE_LEFT:
+                  (*render_list)[*list_size].points[0].x = chunk_size * chunk.x + chunk_size - c.z - 1;
+                  (*render_list)[*list_size].points[0].y = chunk_size * chunk.y + chunk_size - c.x;
+                  (*render_list)[*list_size].points[0].z = chunk_size * chunk.z + c.y;
+                  (*render_list)[*list_size].points[1].x = chunk_size * chunk.x + chunk_size - c.z - 1;
+                  (*render_list)[*list_size].points[1].y = chunk_size * chunk.y + chunk_size - c.x - area[a].s;
+                  (*render_list)[*list_size].points[1].z = chunk_size * chunk.z + c.y;
+                  (*render_list)[*list_size].points[2].x = chunk_size * chunk.x + chunk_size - c.z - 1;
+                  (*render_list)[*list_size].points[2].y = chunk_size * chunk.y + chunk_size - c.x - area[a].s;
+                  (*render_list)[*list_size].points[2].z = chunk_size * chunk.z + c.y + area[a].t;
+                  (*render_list)[*list_size].points[3].x = chunk_size * chunk.x + chunk_size - c.z - 1;
+                  (*render_list)[*list_size].points[3].y = chunk_size * chunk.y + chunk_size - c.x;
+                  (*render_list)[*list_size].points[3].z = chunk_size * chunk.z + c.y + area[a].t;
+                  if (!option_textures) {
+                    (*render_list)[*list_size].coords[0].x = -(*render_list)[*list_size].points[0].y;
+                    (*render_list)[*list_size].coords[1].x = -(*render_list)[*list_size].points[2].y;
+                  } else if (texture_data[texture].x_scale >= 0) {
+                    (*render_list)[*list_size].coords[0].x = -(*render_list)[*list_size].points[0].y * texture_data[texture].x_scale * map_data.resolution.y;
+                    (*render_list)[*list_size].coords[1].x = -(*render_list)[*list_size].points[2].y * texture_data[texture].x_scale * map_data.resolution.y;
+                  } else {
+                    (*render_list)[*list_size].coords[0].x = -(*render_list)[*list_size].points[0].y * -texture_data[texture].x_scale;
+                    (*render_list)[*list_size].coords[1].x = -(*render_list)[*list_size].points[2].y * -texture_data[texture].x_scale;
+                  };
+                  if (!option_textures) {
+                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z;
+                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z;
+                  } else if (texture_data[texture].y_scale >= 0) {
+                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z * texture_data[texture].y_scale * map_data.resolution.z;
+                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z * texture_data[texture].y_scale * map_data.resolution.z;
+                  } else {
+                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z * -texture_data[texture].y_scale;
+                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z * -texture_data[texture].y_scale;
+                  };
+                break;
+                case BLOCK_SIDE_BACK:
+                  (*render_list)[*list_size].points[0].x = chunk_size * chunk.x + chunk_size - c.x;
+                  (*render_list)[*list_size].points[0].y = chunk_size * chunk.y + c.z + 1;
+                  (*render_list)[*list_size].points[0].z = chunk_size * chunk.z + c.y;
+                  (*render_list)[*list_size].points[1].x = chunk_size * chunk.x + chunk_size - c.x - area[a].s;
+                  (*render_list)[*list_size].points[1].y = chunk_size * chunk.y + c.z + 1;
+                  (*render_list)[*list_size].points[1].z = chunk_size * chunk.z + c.y;
+                  (*render_list)[*list_size].points[2].x = chunk_size * chunk.x + chunk_size - c.x - area[a].s;
+                  (*render_list)[*list_size].points[2].y = chunk_size * chunk.y + c.z + 1;
+                  (*render_list)[*list_size].points[2].z = chunk_size * chunk.z + c.y + area[a].t;
+                  (*render_list)[*list_size].points[3].x = chunk_size * chunk.x + chunk_size - c.x;
+                  (*render_list)[*list_size].points[3].y = chunk_size * chunk.y + c.z + 1;
+                  (*render_list)[*list_size].points[3].z = chunk_size * chunk.z + c.y + area[a].t;
+                  if (!option_textures) {
+                    (*render_list)[*list_size].coords[0].x = -(*render_list)[*list_size].points[0].x;
+                    (*render_list)[*list_size].coords[1].x = -(*render_list)[*list_size].points[2].x;
+                  } else if (texture_data[texture].x_scale >= 0) {
+                    (*render_list)[*list_size].coords[0].x = -(*render_list)[*list_size].points[0].x * texture_data[texture].x_scale * map_data.resolution.x;
+                    (*render_list)[*list_size].coords[1].x = -(*render_list)[*list_size].points[2].x * texture_data[texture].x_scale * map_data.resolution.x;
+                  } else {
+                    (*render_list)[*list_size].coords[0].x = -(*render_list)[*list_size].points[0].x * -texture_data[texture].x_scale;
+                    (*render_list)[*list_size].coords[1].x = -(*render_list)[*list_size].points[2].x * -texture_data[texture].x_scale;
+                  };
+                  if (!option_textures) {
+                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z;
+                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z;
+                  } else if (texture_data[texture].y_scale >= 0) {
+                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z * texture_data[texture].y_scale * map_data.resolution.z;
+                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z * texture_data[texture].y_scale * map_data.resolution.z;
+                  } else {
+                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z * -texture_data[texture].y_scale;
+                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z * -texture_data[texture].y_scale;
+                  };
+                break;
+                case BLOCK_SIDE_DOWN:
+                  (*render_list)[*list_size].points[0].x = chunk_size * chunk.x + c.x;
+                  (*render_list)[*list_size].points[0].y = chunk_size * chunk.y + chunk_size - c.y;
+                  (*render_list)[*list_size].points[0].z = chunk_size * chunk.z + chunk_size - c.z - 1;
+                  (*render_list)[*list_size].points[1].x = chunk_size * chunk.x + c.x + area[a].s;
+                  (*render_list)[*list_size].points[1].y = chunk_size * chunk.y + chunk_size - c.y;
+                  (*render_list)[*list_size].points[1].z = chunk_size * chunk.z + chunk_size - c.z - 1;
+                  (*render_list)[*list_size].points[2].x = chunk_size * chunk.x + c.x + area[a].s;
+                  (*render_list)[*list_size].points[2].y = chunk_size * chunk.y + chunk_size - c.y - area[a].t;
+                  (*render_list)[*list_size].points[2].z = chunk_size * chunk.z + chunk_size - c.z - 1;
+                  (*render_list)[*list_size].points[3].x = chunk_size * chunk.x + c.x;
+                  (*render_list)[*list_size].points[3].y = chunk_size * chunk.y + chunk_size - c.y - area[a].t;
+                  (*render_list)[*list_size].points[3].z = chunk_size * chunk.z + chunk_size - c.z - 1;
+                  if (!option_textures) {
+                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x;
+                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x;
+                  } else if (texture_data[texture].x_scale >= 0) {
+                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x * texture_data[texture].x_scale * map_data.resolution.x;
+                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x * texture_data[texture].x_scale * map_data.resolution.x;
+                  } else {
+                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x * -texture_data[texture].x_scale;
+                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x * -texture_data[texture].x_scale;
+                  };
+                  if (!option_textures) {
+                    (*render_list)[*list_size].coords[0].y = -(*render_list)[*list_size].points[0].y;
+                    (*render_list)[*list_size].coords[1].y = -(*render_list)[*list_size].points[2].y;
+                  } else if (texture_data[texture].y_scale >= 0) {
+                    (*render_list)[*list_size].coords[0].y = -(*render_list)[*list_size].points[0].y * texture_data[texture].y_scale * map_data.resolution.y;
+                    (*render_list)[*list_size].coords[1].y = -(*render_list)[*list_size].points[2].y * texture_data[texture].y_scale * map_data.resolution.y;
+                  } else {
+                    (*render_list)[*list_size].coords[0].y = -(*render_list)[*list_size].points[0].y * -texture_data[texture].y_scale;
+                    (*render_list)[*list_size].coords[1].y = -(*render_list)[*list_size].points[2].y * -texture_data[texture].y_scale;
+                  };
+                break;
+              };
+
+              if (++*list_size >= max_list_entries) easy_fuck("max_list_entries exceeded!");
+
+              for (int v = c.y; v < c.y + area[a].t; v++) {
+                for (int u = c.x; u < c.x + area[a].s; u++) {
+                  if (grid[u][v] >= 0) {
+                    grid[u][v] = -1;
+                    grid_count--;
+                  };
+                };
+              };
+
+            };
+            NO_MATCH:;
+          };
+        };
+      };
+
+    };
+  };
+
+  lag_pop();
+
+  if (light_flag) {
+    memory_allocate(&l, 0);
+  };
+
+  memory_allocate(real_list, sizeof(struct structure_render_list) * (*list_size));
+  memmove(*real_list, *render_list, sizeof(struct structure_render_list) * (*list_size));
+  memory_allocate(render_list, 0);
+
+  lag_pop();
+
+};
+
+//--page-split-- map_chunk_thread
+
+void *map_chunk_thread(void *parameter) {
+
+  #ifdef WINDOWS
+  if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_LOWEST)) easy_fuck("Failed to set thread priority.");
+  #else
+  struct sched_param my_param;
+  my_param.sched_priority = 0;
+  if (pthread_setschedparam(pthread_self(), SCHED_IDLE, &my_param)) {
+    fprintf(stderr, "Error: Idle priority was requested, but the OS won't allow it.\n");
+    fprintf(stderr, "Chunk generation thread is running with normal priority.\n");
+  } else {
+    fprintf(stderr, "Chunk generation thread is running with idle priority. :)\n");
+  };
+  #endif
+
+  int thread_index = (int) (long long) ((char *) parameter - (char *) chunk_thread_data) / sizeof(struct structure_chunk_thread_data);
+  //printf("Thread %d starting!\n", thread_index + 1);
+
+  struct structure_chunk_thread_data *my_data = parameter;
+
+  while (!easy_thread_get_exit_flag(&my_data->thread_state)) {
+
+    // Wait until the ring buffer of render_list pointers has free space...
+
+    while (!easy_thread_get_exit_flag(&my_data->thread_state)) {
+      if (((my_data->write_index + 1) & (CHUNK_RING_SIZE - 1)) != my_data->read_index) break;
+      easy_sleep(0.015);
+    };
+    if (easy_thread_get_exit_flag(&my_data->thread_state)) break;
+
+    // Then look for a chunk that requires compilation...
+
+    int distance, closest, priority;
+    struct int_xyz chunk;
+
+    easy_mutex_lock(&chunk_map_mutex);
+
+    closest = 1048576; priority = 0;
+    for (int z = 0; z < chunk_dimension.z; z++) {
+      for (int y = 0; y < chunk_dimension.y; y++) {
+        for (int x = 0; x < chunk_dimension.x; x++) {
+          if ((chunk_map(x, y, z) & (CM_DIRTY | CM_COMPLETE)) == CM_DIRTY && (chunk_map(x, y, z) & (CM_PRIORITY | CM_VISIBLE)) >= priority) {
+            double xx = fabs(x * chunk_size + chunk_size / 2 - player_view.x);
+            double yy = fabs(y * chunk_size + chunk_size / 2 - player_view.y);
+            double zz = fabs(z * chunk_size + chunk_size / 2 - player_view.z);
+            if (map_data.wrap.x && xx >= map_data.dimension.x / 2) xx -= map_data.dimension.x;
+            if (map_data.wrap.y && yy >= map_data.dimension.y / 2) yy -= map_data.dimension.y;
+            if (map_data.wrap.z && zz >= map_data.dimension.z / 2) zz -= map_data.dimension.z;
+            distance = sqrt(pow(xx, 2) + pow(yy, 2) + pow(zz, 2));
+            if ((chunk_map(x, y, z) & (CM_PRIORITY | CM_VISIBLE)) > priority || distance < closest) {
+              priority = chunk_map(x, y, z) & (CM_PRIORITY | CM_VISIBLE);
+              closest = distance;
+              chunk.x = x;
+              chunk.y = y;
+              chunk.z = z;
+            };
+          };
+        };
+      };
+    };
+
+    if (closest == 1048576) {
+      easy_mutex_unlock(&chunk_map_mutex);
+      easy_sleep(0.015);
+      continue;
+    };
+
+    //printf("Found priority %d\n", priority);
+
+    if (chunk_map(chunk.x, chunk.y, chunk.z) & CM_VIRGIN) complete_chunks++;
+    statistics_complete_chunks(complete_chunks, chunk_limit >> 1);
+    chunk_map(chunk.x, chunk.y, chunk.z) |= CM_COMPLETE;
+    chunk_map(chunk.x, chunk.y, chunk.z) &= ~(CM_DIRTY | CM_VIRGIN | CM_PRIORITY);
+
+    easy_mutex_unlock(&chunk_map_mutex);
+
+    my_data->chunk_index[my_data->write_index] = chunk_index(chunk.x, chunk.y, chunk.z);
+    //printf("Calculating chunk %d in slot %d...\n", my_data->chunk_index[my_data->write_index], my_data->write_index);
+    compile_chunk(chunk, &my_data->render_list[my_data->write_index], &my_data->list_size[my_data->write_index]);
+    //printf("Rendered %d polygons to memory %u!\n", my_data->list_size[my_data->write_index], (unsigned int) my_data->render_list[my_data->write_index]);
+    my_data->write_index = (my_data->write_index + 1) & (CHUNK_RING_SIZE - 1);
+
+  };
+
+  //printf("Thread %d terminating!\n", thread_index + 1);
+
 };
 
 //--page-split-- map_begin_render
@@ -144,7 +968,7 @@ void map_begin_render() {
   memory_allocate(&chunk_thread_data, sizeof(struct structure_chunk_thread_data) * map_chunk_thread_count);
   memset(chunk_thread_data, 0, sizeof(struct structure_chunk_thread_data) * map_chunk_thread_count);
   for (int i = 0; i < map_chunk_thread_count; i++) {
-    thread_create(map_chunk_thread, (void *) &chunk_thread_data[i]);
+    easy_thread_fork(&chunk_thread_data[i].thread_state, map_chunk_thread, (void *) &chunk_thread_data[i]);
   };
 
   map_initialization_flag = 1;
@@ -160,11 +984,10 @@ void map_cease_render() {
 
   // Stop chunk threads...
   for (int i = 0; i < map_chunk_thread_count; i++) {
-    chunk_thread_data[i].kill_switch = 1;
+    easy_thread_set_exit_flag(&chunk_thread_data[i].thread_state);
   };
   for (int i = 0; i < map_chunk_thread_count; i++) {
-    // Each thread sets kill_switch back to zero.
-    while (chunk_thread_data[i].kill_switch) easy_sleep(0.01);
+    easy_thread_join(&chunk_thread_data[i].thread_state);
   };
   if (map_chunk_thread_count) while (map_process_a_chunk());
   memory_allocate(&chunk_thread_data, 0);
@@ -1020,747 +1843,6 @@ static void compile_display_list(GLuint display_list, struct structure_render_li
   DEBUG("leave compile_display_list()");
 };
 
-// This code is executed inside separate threads.
-
-//--page-split-- compile_chunk
-
-static void compile_chunk(struct int_xyz chunk, struct structure_render_list **real_list, int *list_size) {
-
-  lag_push(100, "compile_chunk()");
-
-  // Figure out lighting...
-
-  int light_flag = 0;
-  if (option_lighting) {
-    if (map_data.resolution.x < 0.1625) {
-      if (option_lighting == 2) light_flag = 1;
-    } else if (map_data.resolution.x < 1.0 / 3.0) {
-      light_flag = 2;
-    } else {
-      light_flag = 3;
-    };
-  };
-
-  #define LD light_distance
-  #define SD short_distance
-  #define EC extra_chunks
-
-  #define CC (2 * EC + 1)          // chunk count (one dimension) of light area
-  #define BC (CC * chunk_size)     // block count of the same
-  #define BL (CC * chunk_size - 1) // one less?  why does this need a #define?
-
-  int light_distance;
-  int short_distance;
-  int extra_chunks;
-
-  if (light_flag == 1) {
-    light_distance = 64;
-    short_distance = 32;
-    extra_chunks = 2;
-  } else if (light_flag == 2) {
-    light_distance = 32;
-    short_distance = 16;
-    extra_chunks = 1;
-  } else {
-    light_distance = 16;
-    short_distance = 8;
-    extra_chunks = 1;
-  };
-
-  char *b = NULL;
-  char *l = NULL;
-  #define B(x,y,z) *(b + ((z) * BC + (y)) * BC + (x))
-  #define L(x,y,z) *(l + ((z) * BC + (y)) * BC + (x))
-  struct int_xyz *this = NULL;
-  struct int_xyz *next = NULL;
-  struct int_xyz *temp;
-  #define LIST_INCREMENT 65536
-  int this_size = LIST_INCREMENT;
-  int next_size = LIST_INCREMENT;
-  int temp_size;
-  if (light_flag) {
-    memory_allocate(&b, BC*BC*BC);
-    memset(b, 0, BC*BC*BC);
-    memory_allocate(&l, BC*BC*BC);
-    memset(l, 0, BC*BC*BC);
-    memory_allocate(&this, this_size * sizeof(struct int_xyz));
-    memory_allocate(&next, next_size * sizeof(struct int_xyz));
-    int this_i = 0;
-    int next_i = 0;
-    int ll = LD;
-    struct int_xyz a;
-
-    lag_push(1, "* filling array");
-    struct int_xyz c;
-    for (c.z = -EC; c.z <= +EC; c.z++) {
-      for (c.y = -EC; c.y <= +EC; c.y++) {
-        for (c.x = -EC; c.x <= +EC; c.x++) {
-          if (c.x + chunk.x < 0 || c.x + chunk.x >= chunk_dimension.x) continue;
-          if (c.y + chunk.y < 0 || c.y + chunk.y >= chunk_dimension.y) continue;
-          if (c.z + chunk.z < 0 || c.z + chunk.z >= chunk_dimension.z) continue;
-          char *base = map_data.block +
-            ((c.z + chunk.z) * chunk_size * map_data.dimension.y +
-            (c.y + chunk.y) * chunk_size) * map_data.dimension.x +
-            (c.x + chunk.x) * chunk_size;
-          for (int z = 0; z < chunk_size; z++) {
-            if ((chunk.z + c.z) * chunk_size + z >= map_data.dimension.z) break;
-            for (int y = 0; y < chunk_size; y++) {
-              memmove(
-                b + ((
-                  chunk_size * (c.z + EC) + z)
-                  * BC + (chunk_size * (c.y + EC) + y))
-                  * BC + chunk_size * (c.x + EC),
-                base + (z * map_data.dimension.y + y) * map_data.dimension.x,
-                chunk_size
-              );
-            };
-          };
-        };
-      };
-    };
-    lag_pop();
-
-    lag_push(1, "* finding sun 1");
-    if (option_fog_type & 1) {
-      memset(l + BL * BC * BC, LD, BC * BC);
-    } else {
-      memset(l + BL * BC * BC, 0, BC * BC);
-    };
-
-    {
-      a.z = BL;
-      struct int_xyz b;
-      b.z = chunk_size * chunk.z + a.z - chunk_size * EC;
-      if (b.z < map_data.dimension.z) {
-        int z_limit = chunk_size * chunk.z + 96;
-        for (a.y = 0; a.y < BC; a.y++) {
-          b.y = chunk_size * chunk.y + a.y - chunk_size * EC;
-          if (b.y < 0 || b.y >= map_data.dimension.y) continue;
-          for (a.x = 0; a.x < BC; a.x++) {
-            b.x = chunk_size * chunk.x + a.x - chunk_size * EC;
-            if (b.x < 0 || b.x >= map_data.dimension.x) continue;
-            char *base = map_data.block + (b.z * map_data.dimension.y + b.y) * map_data.dimension.x + b.x;
-            char *base_limit = map_data.block + (z_limit * map_data.dimension.y + b.y) * map_data.dimension.x + b.x;
-            if (base_limit > map_data.block + map_data.limit) base_limit = map_data.block + map_data.limit;
-            while (base < base_limit) {
-              int t = *base; base += map_data.dimension.x * map_data.dimension.y;
-              if (block_data[t].emission == 3) {
-                L(a.x, a.y, a.z) = LD;
-                break;
-              };
-              if (block_data[t].visible && !block_data[t].transparent) {
-                L(a.x, a.y, a.z) = 0;
-              };
-            };
-          };
-        };
-      };
-    };
-
-    lag_pop();
-
-    lag_push(1, "* sun flow");
-
-    for (int i = BC * BC * BC - 1; i >= BC * BC; i--) {
-      if (block_data[b[i]].emission == 3) l[i] = LD;
-      if (l[i] == LD) {
-        int j = i - BC * BC;
-        if (!block_data[b[j]].visible || block_data[b[j]].transparent) {
-          l[j] = LD;
-        };
-      };
-    };
-
-    lag_pop();
-
-    lag_push(1, "* finding sun 2");
-    #define CONDITION(x, y, z) (L(x,y,z) < ll - 1 && (!block_data[B(x,y,z)].visible || block_data[B(x,y,z)].transparent))
-    #define ACTION(x, y, z) L(x,y,z) = ll - 1, next[next_i++] = (struct int_xyz) {x, y, z}
-    #define CONDITION_A(x, y, z) (L(x,y,z) <= ll - 1 && (!block_data[B(x,y,z)].visible || block_data[B(x,y,z)].transparent))
-    #define CONDITION_B(x, y, z) (L(x,y,z) < ll - 1)
-    for (a.z = 0; a.z < BC; a.z++) {
-      for (a.y = 0; a.y < BC; a.y++) {
-        for (a.x = 0; a.x < BC; a.x++) {
-          if (L(a.x,a.y,a.z) == ll || block_data[B(a.x,a.y,a.z)].emission >= 2) {
-            if (a.y > 0 && CONDITION_A(a.x, a.y-1, a.z)) {
-              if (CONDITION_B(a.x, a.y-1, a.z)) ACTION(a.x, a.y-1, a.z);
-              if (a.x > 0 && CONDITION(a.x-1, a.y-1, a.z)) ACTION(a.x-1, a.y-1, a.z);
-              if (a.x < BL && CONDITION(a.x+1, a.y-1, a.z)) ACTION(a.x+1, a.y-1, a.z);
-              if (a.z > 0 && CONDITION(a.x, a.y-1, a.z-1)) ACTION(a.x, a.y-1, a.z-1);
-              if (a.z < BL && CONDITION(a.x, a.y-1, a.z+1)) ACTION(a.x, a.y-1, a.z+1);
-            };
-            if (a.y < BL && CONDITION_A(a.x, a.y+1, a.z)) {
-              if (CONDITION_B(a.x, a.y+1, a.z)) ACTION(a.x, a.y+1, a.z);
-              if (a.x > 0 && CONDITION(a.x-1, a.y+1, a.z)) ACTION(a.x-1, a.y+1, a.z);
-              if (a.x < BL && CONDITION(a.x+1, a.y+1, a.z)) ACTION(a.x+1, a.y+1, a.z);
-              if (a.z > 0 && CONDITION(a.x, a.y+1, a.z-1)) ACTION(a.x, a.y+1, a.z-1);
-              if (a.z < BL && CONDITION(a.x, a.y+1, a.z+1)) ACTION(a.x, a.y+1, a.z+1);
-            };
-            if (a.x > 0 && CONDITION_A(a.x-1, a.y, a.z)) {
-              if (CONDITION_B(a.x-1, a.y, a.z)) ACTION(a.x-1, a.y, a.z);
-              if (a.y > 0 && CONDITION(a.x-1, a.y-1, a.z)) ACTION(a.x-1, a.y-1, a.z);
-              if (a.y < BL && CONDITION(a.x-1, a.y+1, a.z)) ACTION(a.x-1, a.y+1, a.z);
-              if (a.z > 0 && CONDITION(a.x-1, a.y, a.z-1)) ACTION(a.x-1, a.y, a.z-1);
-              if (a.z < BL && CONDITION(a.x-1, a.y, a.z+1)) ACTION(a.x-1, a.y, a.z+1);
-            };
-            if (a.x < BL && CONDITION_A(a.x+1, a.y, a.z)) {
-              if (CONDITION_B(a.x+1, a.y, a.z)) ACTION(a.x+1, a.y, a.z);
-              if (a.y > 0 && CONDITION(a.x+1, a.y-1, a.z)) ACTION(a.x+1, a.y-1, a.z);
-              if (a.y < BL && CONDITION(a.x+1, a.y+1, a.z)) ACTION(a.x+1, a.y+1, a.z);
-              if (a.z > 0 && CONDITION(a.x+1, a.y, a.z-1)) ACTION(a.x+1, a.y, a.z-1);
-              if (a.z < BL && CONDITION(a.x+1, a.y, a.z+1)) ACTION(a.x+1, a.y, a.z+1);
-            };
-            if (a.z > 0 && CONDITION_A(a.x, a.y, a.z-1)) {
-              if (CONDITION_B(a.x, a.y, a.z-1)) ACTION(a.x, a.y, a.z-1);
-              if (a.x > 0 && CONDITION(a.x-1, a.y, a.z-1)) ACTION(a.x-1, a.y, a.z-1);
-              if (a.x < BL && CONDITION(a.x+1, a.y, a.z-1)) ACTION(a.x+1, a.y, a.z-1);
-              if (a.y > 0 && CONDITION(a.x, a.y-1, a.z-1)) ACTION(a.x, a.y-1, a.z-1);
-              if (a.y < BL && CONDITION(a.x, a.y+1, a.z-1)) ACTION(a.x, a.y+1, a.z-1);
-            };
-            if (a.z < BL && CONDITION_A(a.x, a.y, a.z+1)) {
-              if (CONDITION_B(a.x, a.y, a.z+1)) ACTION(a.x, a.y, a.z+1);
-              if (a.x > 0 && CONDITION(a.x-1, a.y, a.z+1)) ACTION(a.x-1, a.y, a.z+1);
-              if (a.x < BL && CONDITION(a.x+1, a.y, a.z+1)) ACTION(a.x+1, a.y, a.z+1);
-              if (a.y > 0 && CONDITION(a.x, a.y-1, a.z+1)) ACTION(a.x, a.y-1, a.z+1);
-              if (a.y < BL && CONDITION(a.x, a.y+1, a.z+1)) ACTION(a.x, a.y+1, a.z+1);
-            };
-          };
-          if (next_i > next_size - 27) {
-            next_size += LIST_INCREMENT;
-            memory_allocate(&next, next_size * sizeof(struct int_xyz));
-          };
-        };
-      };
-    };
-    lag_pop();
-
-    ll--;
-
-    #define DIAGONAL_CONDITION_X 1
-    #define DIAGONAL_CONDITION_Y 1
-    #define DIAGONAL_CONDITION_Z 1
-
-    lag_push(1, "* light flow");
-    while (ll >= 2) {
-      if (next_i == 0 && ll > SD) ll = SD;
-      if (next_i == 0 && ll < SD) break;
-      this_i = next_i; next_i = 0;
-      temp = this; this = next; next = temp;
-      temp_size = this_size; this_size = next_size; next_size = temp_size;
-      if (ll == SD) {
-        lag_push(1, "* finding lamps");
-        for (a.z = 0; a.z < BC; a.z++) {
-          for (a.y = 0; a.y < BC; a.y++) {
-            for (a.x = 0; a.x < BC; a.x++) {
-              if (L(a.x,a.y,a.z) == ll || block_data[B(a.x,a.y,a.z)].emission == 1) {
-                if (a.y > 0 && CONDITION_A(a.x, a.y-1, a.z)) {
-                  if (CONDITION_B(a.x, a.y-1, a.z)) ACTION(a.x, a.y-1, a.z);
-                  if (a.x > 0 && CONDITION(a.x-1, a.y-1, a.z)) ACTION(a.x-1, a.y-1, a.z);
-                  if (a.x < BL && CONDITION(a.x+1, a.y-1, a.z)) ACTION(a.x+1, a.y-1, a.z);
-                  if (a.z > 0 && CONDITION(a.x, a.y-1, a.z-1)) ACTION(a.x, a.y-1, a.z-1);
-                  if (a.z < BL && CONDITION(a.x, a.y-1, a.z+1)) ACTION(a.x, a.y-1, a.z+1);
-                };
-                if (a.y < BL && CONDITION_A(a.x, a.y+1, a.z)) {
-                  if (CONDITION_B(a.x, a.y+1, a.z)) ACTION(a.x, a.y+1, a.z);
-                  if (a.x > 0 && CONDITION(a.x-1, a.y+1, a.z)) ACTION(a.x-1, a.y+1, a.z);
-                  if (a.x < BL && CONDITION(a.x+1, a.y+1, a.z)) ACTION(a.x+1, a.y+1, a.z);
-                  if (a.z > 0 && CONDITION(a.x, a.y+1, a.z-1)) ACTION(a.x, a.y+1, a.z-1);
-                  if (a.z < BL && CONDITION(a.x, a.y+1, a.z+1)) ACTION(a.x, a.y+1, a.z+1);
-                };
-                if (a.x > 0 && CONDITION_A(a.x-1, a.y, a.z)) {
-                  if (CONDITION_B(a.x-1, a.y, a.z)) ACTION(a.x-1, a.y, a.z);
-                  if (a.y > 0 && CONDITION(a.x-1, a.y-1, a.z)) ACTION(a.x-1, a.y-1, a.z);
-                  if (a.y < BL && CONDITION(a.x-1, a.y+1, a.z)) ACTION(a.x-1, a.y+1, a.z);
-                  if (a.z > 0 && CONDITION(a.x-1, a.y, a.z-1)) ACTION(a.x-1, a.y, a.z-1);
-                  if (a.z < BL && CONDITION(a.x-1, a.y, a.z+1)) ACTION(a.x-1, a.y, a.z+1);
-                };
-                if (a.x < BL && CONDITION_A(a.x+1, a.y, a.z)) {
-                  if (CONDITION_B(a.x+1, a.y, a.z)) ACTION(a.x+1, a.y, a.z);
-                  if (a.y > 0 && CONDITION(a.x+1, a.y-1, a.z)) ACTION(a.x+1, a.y-1, a.z);
-                  if (a.y < BL && CONDITION(a.x+1, a.y+1, a.z)) ACTION(a.x+1, a.y+1, a.z);
-                  if (a.z > 0 && CONDITION(a.x+1, a.y, a.z-1)) ACTION(a.x+1, a.y, a.z-1);
-                  if (a.z < BL && CONDITION(a.x+1, a.y, a.z+1)) ACTION(a.x+1, a.y, a.z+1);
-                };
-                if (a.z > 0 && CONDITION_A(a.x, a.y, a.z-1)) {
-                  if (CONDITION_B(a.x, a.y, a.z-1)) ACTION(a.x, a.y, a.z-1);
-                  if (a.x > 0 && CONDITION(a.x-1, a.y, a.z-1)) ACTION(a.x-1, a.y, a.z-1);
-                  if (a.x < BL && CONDITION(a.x+1, a.y, a.z-1)) ACTION(a.x+1, a.y, a.z-1);
-                  if (a.y > 0 && CONDITION(a.x, a.y-1, a.z-1)) ACTION(a.x, a.y-1, a.z-1);
-                  if (a.y < BL && CONDITION(a.x, a.y+1, a.z-1)) ACTION(a.x, a.y+1, a.z-1);
-                };
-                if (a.z < BL && CONDITION_A(a.x, a.y, a.z+1)) {
-                  if (CONDITION_B(a.x, a.y, a.z+1)) ACTION(a.x, a.y, a.z+1);
-                  if (a.x > 0 && CONDITION(a.x-1, a.y, a.z+1)) ACTION(a.x-1, a.y, a.z+1);
-                  if (a.x < BL && CONDITION(a.x+1, a.y, a.z+1)) ACTION(a.x+1, a.y, a.z+1);
-                  if (a.y > 0 && CONDITION(a.x, a.y-1, a.z+1)) ACTION(a.x, a.y-1, a.z+1);
-                  if (a.y < BL && CONDITION(a.x, a.y+1, a.z+1)) ACTION(a.x, a.y+1, a.z+1);
-                };
-              };
-              if (next_i > next_size - 27) {
-                next_size += LIST_INCREMENT;
-                memory_allocate(&next, next_size * sizeof(struct int_xyz));
-              };
-            };
-          };
-        };
-        lag_pop();
-      } else {
-        for (int i = 0; i < this_i; i++) {
-          a = this[i];
-          if (L(a.x,a.y,a.z) == ll) {
-            if (a.y > 0 && CONDITION_A(a.x, a.y-1, a.z)) {
-              if (CONDITION_B(a.x, a.y-1, a.z)) ACTION(a.x, a.y-1, a.z);
-              if (a.x > 0 && CONDITION(a.x-1, a.y-1, a.z)) ACTION(a.x-1, a.y-1, a.z);
-              if (a.x < BL && CONDITION(a.x+1, a.y-1, a.z)) ACTION(a.x+1, a.y-1, a.z);
-              if (a.z > 0 && CONDITION(a.x, a.y-1, a.z-1)) ACTION(a.x, a.y-1, a.z-1);
-              if (a.z < BL && CONDITION(a.x, a.y-1, a.z+1)) ACTION(a.x, a.y-1, a.z+1);
-            };
-            if (a.y < BL && CONDITION_A(a.x, a.y+1, a.z)) {
-              if (CONDITION_B(a.x, a.y+1, a.z)) ACTION(a.x, a.y+1, a.z);
-              if (a.x > 0 && CONDITION(a.x-1, a.y+1, a.z)) ACTION(a.x-1, a.y+1, a.z);
-              if (a.x < BL && CONDITION(a.x+1, a.y+1, a.z)) ACTION(a.x+1, a.y+1, a.z);
-              if (a.z > 0 && CONDITION(a.x, a.y+1, a.z-1)) ACTION(a.x, a.y+1, a.z-1);
-              if (a.z < BL && CONDITION(a.x, a.y+1, a.z+1)) ACTION(a.x, a.y+1, a.z+1);
-            };
-            if (a.x > 0 && CONDITION_A(a.x-1, a.y, a.z)) {
-              if (CONDITION_B(a.x-1, a.y, a.z)) ACTION(a.x-1, a.y, a.z);
-              if (a.y > 0 && CONDITION(a.x-1, a.y-1, a.z)) ACTION(a.x-1, a.y-1, a.z);
-              if (a.y < BL && CONDITION(a.x-1, a.y+1, a.z)) ACTION(a.x-1, a.y+1, a.z);
-              if (a.z > 0 && CONDITION(a.x-1, a.y, a.z-1)) ACTION(a.x-1, a.y, a.z-1);
-              if (a.z < BL && CONDITION(a.x-1, a.y, a.z+1)) ACTION(a.x-1, a.y, a.z+1);
-            };
-            if (a.x < BL && CONDITION_A(a.x+1, a.y, a.z)) {
-              if (CONDITION_B(a.x+1, a.y, a.z)) ACTION(a.x+1, a.y, a.z);
-              if (a.y > 0 && CONDITION(a.x+1, a.y-1, a.z)) ACTION(a.x+1, a.y-1, a.z);
-              if (a.y < BL && CONDITION(a.x+1, a.y+1, a.z)) ACTION(a.x+1, a.y+1, a.z);
-              if (a.z > 0 && CONDITION(a.x+1, a.y, a.z-1)) ACTION(a.x+1, a.y, a.z-1);
-              if (a.z < BL && CONDITION(a.x+1, a.y, a.z+1)) ACTION(a.x+1, a.y, a.z+1);
-            };
-            if (a.z > 0 && CONDITION_A(a.x, a.y, a.z-1)) {
-              if (CONDITION_B(a.x, a.y, a.z-1)) ACTION(a.x, a.y, a.z-1);
-              if (a.x > 0 && CONDITION(a.x-1, a.y, a.z-1)) ACTION(a.x-1, a.y, a.z-1);
-              if (a.x < BL && CONDITION(a.x+1, a.y, a.z-1)) ACTION(a.x+1, a.y, a.z-1);
-              if (a.y > 0 && CONDITION(a.x, a.y-1, a.z-1)) ACTION(a.x, a.y-1, a.z-1);
-              if (a.y < BL && CONDITION(a.x, a.y+1, a.z-1)) ACTION(a.x, a.y+1, a.z-1);
-            };
-            if (a.z < BL && CONDITION_A(a.x, a.y, a.z+1)) {
-              if (CONDITION_B(a.x, a.y, a.z+1)) ACTION(a.x, a.y, a.z+1);
-              if (a.x > 0 && CONDITION(a.x-1, a.y, a.z+1)) ACTION(a.x-1, a.y, a.z+1);
-              if (a.x < BL && CONDITION(a.x+1, a.y, a.z+1)) ACTION(a.x+1, a.y, a.z+1);
-              if (a.y > 0 && CONDITION(a.x, a.y-1, a.z+1)) ACTION(a.x, a.y-1, a.z+1);
-              if (a.y < BL && CONDITION(a.x, a.y+1, a.z+1)) ACTION(a.x, a.y+1, a.z+1);
-            };
-          };
-          if (next_i > next_size - 27) {
-            next_size += LIST_INCREMENT;
-            memory_allocate(&next, next_size * sizeof(struct int_xyz));
-          };
-        };
-      };
-      ll--;
-    };
-    lag_pop();
-
-    memory_allocate(&this, 0);
-    memory_allocate(&next, 0);
-    memory_allocate(&b, 0);
-  };
-
-  // Create list of quads from block data...
-
-  int max_list_entries = 6 * chunk_size * chunk_size * chunk_size;
-  struct structure_render_list *the_list = NULL;
-  struct structure_render_list **render_list = &the_list;
-  memory_allocate(render_list, sizeof(struct structure_render_list) * max_list_entries);
-  *list_size = 0;
-
-  lag_push(100, "* reducing polygons");
-
-  struct int_xyz c, m, o;
-  // c = block coordinate within current chunk
-  // m = map coordinate of current block
-  // o = map coordinate of opposite block
-  int i, j, t;
-  int start = 1536;
-  int grid[chunk_size][chunk_size];
-  int light[chunk_size][chunk_size];
-  int grid_count;
-  for (int side = 0; side < 6; side++) {
-    int first_z = 0;
-    if (
-      (side == BLOCK_SIDE_UP && chunk.z == 0) || (side == BLOCK_SIDE_DOWN && chunk.z == chunk_dimension.z - 1) ||
-      (side == BLOCK_SIDE_BACK && chunk.y == 0) || (side == BLOCK_SIDE_FRONT && chunk.y == chunk_dimension.y - 1) ||
-      (side == BLOCK_SIDE_RIGHT && chunk.x == 0) || (side == BLOCK_SIDE_LEFT && chunk.x == chunk_dimension.x - 1)
-    ) {
-      first_z = -1;
-    };
-    for (c.z = first_z; c.z < chunk_size; c.z++) {
-    //for (c.z = chunk_size - 1; c.z >= 0; c.z--) {
-      grid_count = 0;
-      for (c.y = 0; c.y < chunk_size; c.y++) {
-        for (c.x = 0; c.x < chunk_size; c.x++) {
-
-          switch (side) {
-            case BLOCK_SIDE_UP:
-              m.x = (chunk.x << map_chunk_bits) + c.x; o.x = m.x;
-              m.y = (chunk.y << map_chunk_bits) + c.y; o.y = m.y;
-              m.z = (chunk.z << map_chunk_bits) + c.z; o.z = m.z + 1;
-            break;
-            case BLOCK_SIDE_FRONT:
-              m.x = (chunk.x << map_chunk_bits) + c.x; o.x = m.x;
-              m.y = (chunk.y << map_chunk_bits) - c.z + (1 << map_chunk_bits) - 1; o.y = m.y - 1;
-              m.z = (chunk.z << map_chunk_bits) + c.y; o.z = m.z;
-            break;
-            case BLOCK_SIDE_RIGHT:
-              m.x = (chunk.x << map_chunk_bits) + c.z; o.x = m.x + 1;
-              m.y = (chunk.y << map_chunk_bits) + c.x; o.y = m.y;
-              m.z = (chunk.z << map_chunk_bits) + c.y; o.z = m.z;
-            break;
-            case BLOCK_SIDE_LEFT:
-              m.x = (chunk.x << map_chunk_bits) - c.z + (1 << map_chunk_bits) - 1; o.x = m.x - 1;
-              m.y = (chunk.y << map_chunk_bits) - c.x + (1 << map_chunk_bits) - 1; o.y = m.y;
-              m.z = (chunk.z << map_chunk_bits) + c.y; o.z = m.z;
-            break;
-            case BLOCK_SIDE_BACK:
-              m.x = (chunk.x << map_chunk_bits) - c.x + (1 << map_chunk_bits) - 1; o.x = m.x;
-              m.y = (chunk.y << map_chunk_bits) + c.z; o.y = m.y + 1;
-              m.z = (chunk.z << map_chunk_bits) + c.y; o.z = m.z;
-            break;
-            case BLOCK_SIDE_DOWN:
-              m.x = (chunk.x << map_chunk_bits) + c.x; o.x = m.x;
-              m.y = (chunk.y << map_chunk_bits) - c.y + (1 << map_chunk_bits) - 1; o.y = m.y;
-              m.z = (chunk.z << map_chunk_bits) - c.z + (1 << map_chunk_bits) - 1; o.z = m.z - 1;
-            break;
-          };
-
-          i = map_get_block_type(m); // the block we are working on
-          j = map_get_block_type(o); // the block opposite this one
-          t = -1; // which texture we've decided to render here
-
-          // if the opposite block doesn't obstruct the view of this block
-          if (!block_data[j].visible || block_data[j].transparent) {
-            // if this block has visible textures
-            if (block_data[i].visible) {
-              // and it's a different block
-              if (i != j || block_data[i].between) {
-                t = block_data[i].index[side];
-              };
-            };
-          };
-
-          // if the opposite block has a reverse texture and we haven't chosen
-          // to draw a forward texture for this block, then draw the reverse texture
-          if (t == -1 && block_data[j].visible) {
-            if (block_data[j].reverse) {
-              if (i != j) {
-                t = block_data[j].index[5-side];
-              };
-            };
-          };
-
-          // Show invalid texture when block type zero is involved.
-          if (t >= 0 && (i == 0 || j == 0)) t = TEXTURE_NO_ZERO;
-
-          grid[c.x][c.y] = t;
-          if (light_flag) {
-            if (block_data[i].emission) {
-              light[c.x][c.y] = 255;
-            } else {
-              int t = L(o.x - chunk_size * chunk.x + chunk_size * EC, o.y - chunk_size * chunk.y + chunk_size * EC, o.z - chunk_size * chunk.z + chunk_size * EC);
-              //if (option_quantization && t < 64) t = 3 * ceil(t / 3.0);
-              light[c.x][c.y] = t;
-            };
-          } else {
-            light[c.x][c.y] = LD;
-          };
-          if (t >= 0) grid_count++;
-
-        };
-      };
-
-      // Reduce polygons here!
-
-      for (int a = 0; a < area_count && grid_count; a++) {
-        if (area[a].s > chunk_size || area[a].t > chunk_size) continue;
-        for (c.y = 0; c.y <= chunk_size - area[a].t; c.y++) {
-          for (c.x = 0; c.x <= chunk_size - area[a].s; c.x++) {
-            int texture = -2; int shade;
-            for (int v = c.y; v < c.y + area[a].t; v++) {
-              for (int u = c.x; u < c.x + area[a].s; u++) {
-                if (grid[u][v] == -1) goto NO_MATCH;
-                if (grid[u][v] >= 0) {
-                  if (texture == -2) {
-                    texture = grid[u][v];
-                    shade = light[u][v];
-                  };
-                  if (grid[u][v] != texture || light[u][v] != shade) goto NO_MATCH;
-                };
-              };
-            };
-            if (texture >= 0) {
-
-              #ifdef TEST
-              area_tally[a]++;
-              #endif
-
-              if (texture < start) start = texture;
-              (*render_list)[*list_size].index = texture;
-              (*render_list)[*list_size].side = side;
-              if (light[c.x][c.y] > LD) {
-                (*render_list)[*list_size].light = 2.0;
-              } else if (light[c.x][c.y] == LD) {
-                (*render_list)[*list_size].light = 1.0;
-              } else {
-                double l = light[c.x][c.y] / (double) LD;
-                l = pow(l, 1.2);
-                (*render_list)[*list_size].light = 0.05 + 0.7 * l;
-              };
-
-              #ifdef TEST
-              //  (*render_list)[*list_size].light = easy_random(255) / 255.0;
-              #endif
-
-              switch (side) {
-                case BLOCK_SIDE_UP:
-                  (*render_list)[*list_size].points[0].x = chunk_size * chunk.x + c.x;
-                  (*render_list)[*list_size].points[0].y = chunk_size * chunk.y + c.y;
-                  (*render_list)[*list_size].points[0].z = chunk_size * chunk.z + c.z + 1;
-                  (*render_list)[*list_size].points[1].x = chunk_size * chunk.x + c.x + area[a].s;
-                  (*render_list)[*list_size].points[1].y = chunk_size * chunk.y + c.y;
-                  (*render_list)[*list_size].points[1].z = chunk_size * chunk.z + c.z + 1;
-                  (*render_list)[*list_size].points[2].x = chunk_size * chunk.x + c.x + area[a].s;
-                  (*render_list)[*list_size].points[2].y = chunk_size * chunk.y + c.y + area[a].t;
-                  (*render_list)[*list_size].points[2].z = chunk_size * chunk.z + c.z + 1;
-                  (*render_list)[*list_size].points[3].x = chunk_size * chunk.x + c.x;
-                  (*render_list)[*list_size].points[3].y = chunk_size * chunk.y + c.y + area[a].t;
-                  (*render_list)[*list_size].points[3].z = chunk_size * chunk.z + c.z + 1;
-                  if (!option_textures) {
-                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x;
-                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x;
-                  } else if (texture_data[texture].x_scale >= 0) {
-                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x * texture_data[texture].x_scale * map_data.resolution.x;
-                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x * texture_data[texture].x_scale * map_data.resolution.x;
-                  } else {
-                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x * -texture_data[texture].x_scale;
-                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x * -texture_data[texture].x_scale;
-                  };
-                  if (!option_textures) {
-                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].y;
-                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].y;
-                  } else if (texture_data[texture].y_scale >= 0) {
-                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].y * texture_data[texture].y_scale * map_data.resolution.y;
-                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].y * texture_data[texture].y_scale * map_data.resolution.y;
-                  } else {
-                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].y * -texture_data[texture].y_scale;
-                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].y * -texture_data[texture].y_scale;
-                  };
-                break;
-                case BLOCK_SIDE_FRONT:
-                  (*render_list)[*list_size].points[0].x = chunk_size * chunk.x + c.x;
-                  (*render_list)[*list_size].points[0].y = chunk_size * chunk.y + chunk_size - c.z - 1;
-                  (*render_list)[*list_size].points[0].z = chunk_size * chunk.z + c.y;
-                  (*render_list)[*list_size].points[1].x = chunk_size * chunk.x + c.x + area[a].s;
-                  (*render_list)[*list_size].points[1].y = chunk_size * chunk.y + chunk_size - c.z - 1;
-                  (*render_list)[*list_size].points[1].z = chunk_size * chunk.z + c.y;
-                  (*render_list)[*list_size].points[2].x = chunk_size * chunk.x + c.x + area[a].s;
-                  (*render_list)[*list_size].points[2].y = chunk_size * chunk.y + chunk_size - c.z - 1;
-                  (*render_list)[*list_size].points[2].z = chunk_size * chunk.z + c.y + area[a].t;
-                  (*render_list)[*list_size].points[3].x = chunk_size * chunk.x + c.x;
-                  (*render_list)[*list_size].points[3].y = chunk_size * chunk.y + chunk_size - c.z - 1;
-                  (*render_list)[*list_size].points[3].z = chunk_size * chunk.z + c.y + area[a].t;
-                  if (!option_textures) {
-                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x;
-                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x;
-                  } else if (texture_data[texture].x_scale >= 0) {
-                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x * texture_data[texture].x_scale * map_data.resolution.x;
-                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x * texture_data[texture].x_scale * map_data.resolution.x;
-                  } else {
-                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x * -texture_data[texture].x_scale;
-                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x * -texture_data[texture].x_scale;
-                  };
-                  if (!option_textures) {
-                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z;
-                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z;
-                  } else if (texture_data[texture].y_scale >= 0) {
-                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z * texture_data[texture].y_scale * map_data.resolution.z;
-                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z * texture_data[texture].y_scale * map_data.resolution.z;
-                  } else {
-                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z * -texture_data[texture].y_scale;
-                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z * -texture_data[texture].y_scale;
-                  };
-                break;
-                case BLOCK_SIDE_RIGHT:
-                  (*render_list)[*list_size].points[0].x = chunk_size * chunk.x + c.z + 1;
-                  (*render_list)[*list_size].points[0].y = chunk_size * chunk.y + c.x;
-                  (*render_list)[*list_size].points[0].z = chunk_size * chunk.z + c.y;
-                  (*render_list)[*list_size].points[1].x = chunk_size * chunk.x + c.z + 1;
-                  (*render_list)[*list_size].points[1].y = chunk_size * chunk.y + c.x + area[a].s;
-                  (*render_list)[*list_size].points[1].z = chunk_size * chunk.z + c.y;
-                  (*render_list)[*list_size].points[2].x = chunk_size * chunk.x + c.z + 1;
-                  (*render_list)[*list_size].points[2].y = chunk_size * chunk.y + c.x + area[a].s;
-                  (*render_list)[*list_size].points[2].z = chunk_size * chunk.z + c.y + area[a].t;
-                  (*render_list)[*list_size].points[3].x = chunk_size * chunk.x + c.z + 1;
-                  (*render_list)[*list_size].points[3].y = chunk_size * chunk.y + c.x;
-                  (*render_list)[*list_size].points[3].z = chunk_size * chunk.z + c.y + area[a].t;
-                  if (!option_textures) {
-                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].y;
-                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].y;
-                  } else if (texture_data[texture].x_scale >= 0) {
-                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].y * texture_data[texture].x_scale * map_data.resolution.y;
-                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].y * texture_data[texture].x_scale * map_data.resolution.y;
-                  } else {
-                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].y * -texture_data[texture].x_scale;
-                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].y * -texture_data[texture].x_scale;
-                  };
-                  if (!option_textures) {
-                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z;
-                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z;
-                  } else if (texture_data[texture].y_scale >= 0) {
-                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z * texture_data[texture].y_scale * map_data.resolution.z;
-                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z * texture_data[texture].y_scale * map_data.resolution.z;
-                  } else {
-                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z * -texture_data[texture].y_scale;
-                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z * -texture_data[texture].y_scale;
-                  };
-                break;
-                case BLOCK_SIDE_LEFT:
-                  (*render_list)[*list_size].points[0].x = chunk_size * chunk.x + chunk_size - c.z - 1;
-                  (*render_list)[*list_size].points[0].y = chunk_size * chunk.y + chunk_size - c.x;
-                  (*render_list)[*list_size].points[0].z = chunk_size * chunk.z + c.y;
-                  (*render_list)[*list_size].points[1].x = chunk_size * chunk.x + chunk_size - c.z - 1;
-                  (*render_list)[*list_size].points[1].y = chunk_size * chunk.y + chunk_size - c.x - area[a].s;
-                  (*render_list)[*list_size].points[1].z = chunk_size * chunk.z + c.y;
-                  (*render_list)[*list_size].points[2].x = chunk_size * chunk.x + chunk_size - c.z - 1;
-                  (*render_list)[*list_size].points[2].y = chunk_size * chunk.y + chunk_size - c.x - area[a].s;
-                  (*render_list)[*list_size].points[2].z = chunk_size * chunk.z + c.y + area[a].t;
-                  (*render_list)[*list_size].points[3].x = chunk_size * chunk.x + chunk_size - c.z - 1;
-                  (*render_list)[*list_size].points[3].y = chunk_size * chunk.y + chunk_size - c.x;
-                  (*render_list)[*list_size].points[3].z = chunk_size * chunk.z + c.y + area[a].t;
-                  if (!option_textures) {
-                    (*render_list)[*list_size].coords[0].x = -(*render_list)[*list_size].points[0].y;
-                    (*render_list)[*list_size].coords[1].x = -(*render_list)[*list_size].points[2].y;
-                  } else if (texture_data[texture].x_scale >= 0) {
-                    (*render_list)[*list_size].coords[0].x = -(*render_list)[*list_size].points[0].y * texture_data[texture].x_scale * map_data.resolution.y;
-                    (*render_list)[*list_size].coords[1].x = -(*render_list)[*list_size].points[2].y * texture_data[texture].x_scale * map_data.resolution.y;
-                  } else {
-                    (*render_list)[*list_size].coords[0].x = -(*render_list)[*list_size].points[0].y * -texture_data[texture].x_scale;
-                    (*render_list)[*list_size].coords[1].x = -(*render_list)[*list_size].points[2].y * -texture_data[texture].x_scale;
-                  };
-                  if (!option_textures) {
-                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z;
-                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z;
-                  } else if (texture_data[texture].y_scale >= 0) {
-                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z * texture_data[texture].y_scale * map_data.resolution.z;
-                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z * texture_data[texture].y_scale * map_data.resolution.z;
-                  } else {
-                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z * -texture_data[texture].y_scale;
-                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z * -texture_data[texture].y_scale;
-                  };
-                break;
-                case BLOCK_SIDE_BACK:
-                  (*render_list)[*list_size].points[0].x = chunk_size * chunk.x + chunk_size - c.x;
-                  (*render_list)[*list_size].points[0].y = chunk_size * chunk.y + c.z + 1;
-                  (*render_list)[*list_size].points[0].z = chunk_size * chunk.z + c.y;
-                  (*render_list)[*list_size].points[1].x = chunk_size * chunk.x + chunk_size - c.x - area[a].s;
-                  (*render_list)[*list_size].points[1].y = chunk_size * chunk.y + c.z + 1;
-                  (*render_list)[*list_size].points[1].z = chunk_size * chunk.z + c.y;
-                  (*render_list)[*list_size].points[2].x = chunk_size * chunk.x + chunk_size - c.x - area[a].s;
-                  (*render_list)[*list_size].points[2].y = chunk_size * chunk.y + c.z + 1;
-                  (*render_list)[*list_size].points[2].z = chunk_size * chunk.z + c.y + area[a].t;
-                  (*render_list)[*list_size].points[3].x = chunk_size * chunk.x + chunk_size - c.x;
-                  (*render_list)[*list_size].points[3].y = chunk_size * chunk.y + c.z + 1;
-                  (*render_list)[*list_size].points[3].z = chunk_size * chunk.z + c.y + area[a].t;
-                  if (!option_textures) {
-                    (*render_list)[*list_size].coords[0].x = -(*render_list)[*list_size].points[0].x;
-                    (*render_list)[*list_size].coords[1].x = -(*render_list)[*list_size].points[2].x;
-                  } else if (texture_data[texture].x_scale >= 0) {
-                    (*render_list)[*list_size].coords[0].x = -(*render_list)[*list_size].points[0].x * texture_data[texture].x_scale * map_data.resolution.x;
-                    (*render_list)[*list_size].coords[1].x = -(*render_list)[*list_size].points[2].x * texture_data[texture].x_scale * map_data.resolution.x;
-                  } else {
-                    (*render_list)[*list_size].coords[0].x = -(*render_list)[*list_size].points[0].x * -texture_data[texture].x_scale;
-                    (*render_list)[*list_size].coords[1].x = -(*render_list)[*list_size].points[2].x * -texture_data[texture].x_scale;
-                  };
-                  if (!option_textures) {
-                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z;
-                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z;
-                  } else if (texture_data[texture].y_scale >= 0) {
-                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z * texture_data[texture].y_scale * map_data.resolution.z;
-                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z * texture_data[texture].y_scale * map_data.resolution.z;
-                  } else {
-                    (*render_list)[*list_size].coords[0].y = +(*render_list)[*list_size].points[0].z * -texture_data[texture].y_scale;
-                    (*render_list)[*list_size].coords[1].y = +(*render_list)[*list_size].points[2].z * -texture_data[texture].y_scale;
-                  };
-                break;
-                case BLOCK_SIDE_DOWN:
-                  (*render_list)[*list_size].points[0].x = chunk_size * chunk.x + c.x;
-                  (*render_list)[*list_size].points[0].y = chunk_size * chunk.y + chunk_size - c.y;
-                  (*render_list)[*list_size].points[0].z = chunk_size * chunk.z + chunk_size - c.z - 1;
-                  (*render_list)[*list_size].points[1].x = chunk_size * chunk.x + c.x + area[a].s;
-                  (*render_list)[*list_size].points[1].y = chunk_size * chunk.y + chunk_size - c.y;
-                  (*render_list)[*list_size].points[1].z = chunk_size * chunk.z + chunk_size - c.z - 1;
-                  (*render_list)[*list_size].points[2].x = chunk_size * chunk.x + c.x + area[a].s;
-                  (*render_list)[*list_size].points[2].y = chunk_size * chunk.y + chunk_size - c.y - area[a].t;
-                  (*render_list)[*list_size].points[2].z = chunk_size * chunk.z + chunk_size - c.z - 1;
-                  (*render_list)[*list_size].points[3].x = chunk_size * chunk.x + c.x;
-                  (*render_list)[*list_size].points[3].y = chunk_size * chunk.y + chunk_size - c.y - area[a].t;
-                  (*render_list)[*list_size].points[3].z = chunk_size * chunk.z + chunk_size - c.z - 1;
-                  if (!option_textures) {
-                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x;
-                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x;
-                  } else if (texture_data[texture].x_scale >= 0) {
-                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x * texture_data[texture].x_scale * map_data.resolution.x;
-                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x * texture_data[texture].x_scale * map_data.resolution.x;
-                  } else {
-                    (*render_list)[*list_size].coords[0].x = +(*render_list)[*list_size].points[0].x * -texture_data[texture].x_scale;
-                    (*render_list)[*list_size].coords[1].x = +(*render_list)[*list_size].points[2].x * -texture_data[texture].x_scale;
-                  };
-                  if (!option_textures) {
-                    (*render_list)[*list_size].coords[0].y = -(*render_list)[*list_size].points[0].y;
-                    (*render_list)[*list_size].coords[1].y = -(*render_list)[*list_size].points[2].y;
-                  } else if (texture_data[texture].y_scale >= 0) {
-                    (*render_list)[*list_size].coords[0].y = -(*render_list)[*list_size].points[0].y * texture_data[texture].y_scale * map_data.resolution.y;
-                    (*render_list)[*list_size].coords[1].y = -(*render_list)[*list_size].points[2].y * texture_data[texture].y_scale * map_data.resolution.y;
-                  } else {
-                    (*render_list)[*list_size].coords[0].y = -(*render_list)[*list_size].points[0].y * -texture_data[texture].y_scale;
-                    (*render_list)[*list_size].coords[1].y = -(*render_list)[*list_size].points[2].y * -texture_data[texture].y_scale;
-                  };
-                break;
-              };
-
-              if (++*list_size >= max_list_entries) easy_fuck("max_list_entries exceeded!");
-
-              for (int v = c.y; v < c.y + area[a].t; v++) {
-                for (int u = c.x; u < c.x + area[a].s; u++) {
-                  if (grid[u][v] >= 0) {
-                    grid[u][v] = -1;
-                    grid_count--;
-                  };
-                };
-              };
-
-            };
-            NO_MATCH:;
-          };
-        };
-      };
-
-    };
-  };
-
-  lag_pop();
-
-  if (light_flag) {
-    memory_allocate(&l, 0);
-  };
-
-  memory_allocate(real_list, sizeof(struct structure_render_list) * (*list_size));
-  memmove(*real_list, *render_list, sizeof(struct structure_render_list) * (*list_size));
-  memory_allocate(render_list, 0);
-
-  lag_pop();
-
-};
-
 //--page-split-- map_process_a_chunk
 
 int map_process_a_chunk() {
@@ -1886,89 +1968,7 @@ int map_process_a_chunk() {
 
 };
 
-//--page-split-- map_chunk_thread
-
-void *map_chunk_thread(void *parameter) {
-
-  thread_priority_background();
-
-  int thread_index = (int) (long long) ((char *) parameter - (char *) chunk_thread_data) / sizeof(struct structure_chunk_thread_data);
-  //printf("Thread %d starting!\n", thread_index + 1);
-
-  struct structure_chunk_thread_data *my_data = parameter;
-
-  while (!my_data->kill_switch) {
-
-    // Wait until the ring buffer of render_list pointers has free space...
-
-    while (!my_data->kill_switch && ((my_data->write_index + 1) & (CHUNK_RING_SIZE - 1)) == my_data->read_index) {
-      if (my_data->kill_switch) break;
-      easy_sleep(0.015);
-    };
-    if (my_data->kill_switch) break;
-
-    // Then look for a chunk that requires compilation...
-
-    int distance, closest, priority;
-    struct int_xyz chunk;
-
-    MUTEX_LOCK(chunk_map_mutex);
-
-    closest = 1048576; priority = 0;
-    for (int z = 0; z < chunk_dimension.z; z++) {
-      for (int y = 0; y < chunk_dimension.y; y++) {
-        for (int x = 0; x < chunk_dimension.x; x++) {
-          if ((chunk_map(x, y, z) & (CM_DIRTY | CM_COMPLETE)) == CM_DIRTY && (chunk_map(x, y, z) & (CM_PRIORITY | CM_VISIBLE)) >= priority) {
-            double xx = fabs(x * chunk_size + chunk_size / 2 - player_view.x);
-            double yy = fabs(y * chunk_size + chunk_size / 2 - player_view.y);
-            double zz = fabs(z * chunk_size + chunk_size / 2 - player_view.z);
-            if (map_data.wrap.x && xx >= map_data.dimension.x / 2) xx -= map_data.dimension.x;
-            if (map_data.wrap.y && yy >= map_data.dimension.y / 2) yy -= map_data.dimension.y;
-            if (map_data.wrap.z && zz >= map_data.dimension.z / 2) zz -= map_data.dimension.z;
-            distance = sqrt(pow(xx, 2) + pow(yy, 2) + pow(zz, 2));
-            if ((chunk_map(x, y, z) & (CM_PRIORITY | CM_VISIBLE)) > priority || distance < closest) {
-              priority = chunk_map(x, y, z) & (CM_PRIORITY | CM_VISIBLE);
-              closest = distance;
-              chunk.x = x;
-              chunk.y = y;
-              chunk.z = z;
-            };
-          };
-        };
-      };
-    };
-
-    if (closest == 1048576) {
-      MUTEX_UNLOCK(chunk_map_mutex);
-      easy_sleep(0.015);
-      continue;
-    };
-
-    //printf("Found priority %d\n", priority);
-
-    if (chunk_map(chunk.x, chunk.y, chunk.z) & CM_VIRGIN) complete_chunks++;
-    statistics_complete_chunks(complete_chunks, chunk_limit >> 1);
-    chunk_map(chunk.x, chunk.y, chunk.z) |= CM_COMPLETE;
-    chunk_map(chunk.x, chunk.y, chunk.z) &= ~(CM_DIRTY | CM_VIRGIN | CM_PRIORITY);
-
-    MUTEX_UNLOCK(chunk_map_mutex);
-
-    my_data->chunk_index[my_data->write_index] = chunk_index(chunk.x, chunk.y, chunk.z);
-    //printf("Calculating chunk %d in slot %d...\n", my_data->chunk_index[my_data->write_index], my_data->write_index);
-    compile_chunk(chunk, &my_data->render_list[my_data->write_index], &my_data->list_size[my_data->write_index]);
-    //printf("Rendered %d polygons to memory %u!\n", my_data->list_size[my_data->write_index], (unsigned int) my_data->render_list[my_data->write_index]);
-    my_data->write_index = (my_data->write_index + 1) & (CHUNK_RING_SIZE - 1);
-
-  };
-
-  //printf("Thread %d terminating!\n", thread_index + 1);
-
-  my_data->kill_switch = 0;
-
-};
-
 //--page-split-- map_render
-
 
 void map_render() {
 
@@ -1989,8 +1989,8 @@ void map_render() {
   };
 
   if ((option_fog_type & 1) == 0) {
-    glClearColor(0.05 * r_mask, 0.05 * g_mask, 0.05 * b_mask, 1.0);
-    glFogfv(GL_FOG_COLOR, (GLfloat[]) {0.05 * r_mask, 0.05 * g_mask, 0.05 * b_mask, 1.0});
+    glClearColor(0.02 * r_mask, 0.02 * g_mask, 0.02 * b_mask, 1.0);
+    glFogfv(GL_FOG_COLOR, (GLfloat[]) {0.02 * r_mask, 0.02 * g_mask, 0.02 * b_mask, 1.0});
   } else if (RENDER_IN_GRAYSCALE) {
     glClearColor(0.8 * r_mask, 0.8 * g_mask, 0.8 * b_mask, 1.0);
     glFogfv(GL_FOG_COLOR, (GLfloat[]) {0.8 * r_mask, 0.8 * g_mask, 0.8 * b_mask, 1.0});

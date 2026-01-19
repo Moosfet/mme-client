@@ -26,7 +26,7 @@ void stars_open_window() {
   glHint(GL_POINT_SMOOTH_HINT, GL_NICEST);
   glEnable(GL_POINT_SMOOTH);
 
-  #define brightness (7 * star[i][3])
+  #define brightness (0.02 * star[i][3] / 0.000425)
 
   int i;
   int dark = 0;
@@ -34,7 +34,13 @@ void stars_open_window() {
   glPointSize(1.5);
   glBegin(GL_POINTS);
   for (i = 0; i < star_count && brightness <= 1.0; i++) {
-    double gray = pow(brightness, 0.4545);
+    //double gray = pow(brightness, 1.0 / 2.2);
+    double gray = brightness;
+    static int first = 1;
+    if (first) {
+      first = 0;
+      printf("\e[1;33mfirst star is %f\e[0m\n", gray);
+    };
     glColor3f(gray, gray, gray);
     glVertex3f(star[i][0], star[i][1], star[i][2]);
   };

@@ -22,6 +22,7 @@ double server_connect_time = -1.0;
 double server_ping_time = 0.0;
 
 char *server_address = NULL;
+char *server_portal_address = NULL;
 char *server_authentication = NULL;
 char *server_portal_authentication = NULL;
 
@@ -34,7 +35,7 @@ static double last_position_time = 0;
 
 //--page-split-- communicate_with_server
 
-static void communicate_with_server() {
+void communicate_with_server() {
 
   // Read from the network socket into our buffer...
 
@@ -181,8 +182,8 @@ void server_stuff() {
     };
     if (server_action == SERVER_ACTION_CONNECT) {
       if (server_address == NULL) {
-        memory_allocate(&server_address, strlen(PORTAL_ADDRESS) + 1);
-        strcpy(server_address, PORTAL_ADDRESS);
+        memory_allocate(&server_address, strlen(server_portal_address) + 1);
+        strcpy(server_address, server_portal_address);
       };
       server_error_string = NULL;
       packet_reset();
@@ -236,7 +237,7 @@ void server_stuff() {
     if (server_action == SERVER_ACTION_CONNECT) {
       if (received_packet_selections && !sent_authentication_packet) {
         packet_send(PACKET_CLIENT_VERSION);
-        if (strcmp(server_address, PORTAL_ADDRESS)) {
+        if (strcmp(server_address, server_portal_address)) {
           packet_send(PACKET_AUTHENTICATE, server_authentication);
         } else {
           if (option_have_cookie && packet_is_sendable(PACKET_PORTAL_COOKIE)) {
@@ -439,7 +440,7 @@ void server_process_packet(int packet_type, char *packet_data, int packet_size) 
       };
     };
   } else if (packet_type == PACKET_CONNECT) {
-    if (packet_size == 52 && !strcmp(server_address, PORTAL_ADDRESS)) {
+    if (packet_size == 52 && !strcmp(server_address, server_portal_address)) {
       memory_allocate(&server_portal_authentication, 52);
       memmove(server_portal_authentication, &DATA(0, char), 52);
     } else if (packet_size >= 53) {
@@ -458,7 +459,7 @@ void server_process_packet(int packet_type, char *packet_data, int packet_size) 
       printf("\e[1;31m%s: Invalid packet size! (payload is %d bytes)\e[0m\n", packet_type_to_string(packet_type), packet_size);
     };
   } else if (packet_type == PACKET_PORTAL_COOKIE) {
-    if (!strcmp(server_address, PORTAL_ADDRESS)) {
+    if (!strcmp(server_address, server_portal_address)) {
       if (packet_size == 20) {
         memmove(option_cookie_data, &DATA(0, char), 20);
         option_have_cookie = 1;
@@ -515,7 +516,7 @@ void server_process_packet(int packet_type, char *packet_data, int packet_size) 
     server_status = SERVER_STATUS_DISCONNECTED;
     on_server_disconnect();
     server_action = SERVER_ACTION_DISCONNECT;
-    if (reason == DISCONNECT_RANDOM && !strcmp(server_address, PORTAL_ADDRESS)) menu_switch(menus_exit);
+    if (reason == DISCONNECT_RANDOM && !strcmp(server_address, server_portal_address)) menu_switch(menus_exit);
   } else if (packet_type == PACKET_ANNOUNCE_PLAYER) {
     if (packet_size < 26) {
       if (argument_packets) printf("\e[1;31m%s: Invalid packet size! (payload is %d bytes)\e[0m\n", packet_type_to_string(packet_type), packet_size);

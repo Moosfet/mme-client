@@ -196,7 +196,7 @@ int packet_send(int packet_type, ...) {
     unsigned char vector[8192];
     memset(vector, 0, 8192);
     for (int i = 0; i < sizeof(sendable) / sizeof(int); i++) {
-      if (sendable[i] == PACKET_PORTAL_COOKIE && strcmp(server_address, PORTAL_ADDRESS)) continue;
+      if (sendable[i] == PACKET_PORTAL_COOKIE && strcmp(server_address, server_portal_address)) continue;
       int index = sendable[i] / 8;
       int bit = 1 << (sendable[i] % 8);
       vector[index] |= bit;
@@ -644,7 +644,7 @@ char *packet_parse_stream(char *buffer, int length) {
       choose(PACKET_PROJECTILE_CREATE);
       choose(PACKET_PROJECTILE_COLLISION);
 
-      if (!strcmp(server_address, PORTAL_ADDRESS)) choose(PACKET_PORTAL_COOKIE);
+      if (!strcmp(server_address, server_portal_address)) choose(PACKET_PORTAL_COOKIE);
 
       // Send our selections to the remote system...
 

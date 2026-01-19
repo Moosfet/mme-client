@@ -1,24 +1,5 @@
 #include "everything.h"
 
-// The old stuff, just in case reference is needed.
-//#ifdef WINDOWS
-//  #define error_code WSAGetLastError()
-//  #define ECONNREFUSED WSAECONNREFUSED
-//  #define EHOSTUNREACH WSAEHOSTUNREACH
-//  #define ENETUNREACH WSAENETUNREACH
-//  #define ETIMEDOUT WSAETIMEDOUT
-//  #define EINVAL WSAEINVAL
-//  #define ECONNRESET WSAECONNRESET
-//  #define ECONNABORTED WSAECONNABORTED
-//  static HANDLE mutex;
-//#else
-//  #define error_code errno
-//  #define INVALID_SOCKET -1
-//  #define SOCKET_ERROR -1
-//  #define closesocket close
-//  static pthread_mutex_t mutex;
-//#endif */
-
 #ifdef WINDOWS
   #define WINVER WindowsXP
   #include <w32api.h>
@@ -33,7 +14,6 @@
   //#define EINVAL WSAEINVAL
   //#define ECONNRESET WSAECONNRESET
   //#define ECONNABORTED WSAECONNABORTED
-  static HANDLE mutex;
 #else
   #include <sys/types.h> // recommended for socket, bind, recvfrom, getaddrinfo
   #include <sys/socket.h> // required for socket, bind, recvfrom, inet_ntoa, getaddrinfo
@@ -48,11 +28,14 @@
   #define INVALID_SOCKET -1
   #define SOCKET_ERROR -1
   #define closesocket close
-  static pthread_mutex_t mutex;
   #include <signal.h>
   #include <unistd.h>
   #include <fcntl.h>
 #endif
+
+static pthread_mutex_t mutex;
+
+static struct easy_thread_state thread_state;
 
 struct structure_socket_data {
   int socket;
@@ -69,7 +52,7 @@ static char *custom_error_string = NULL;
 //--page-split-- network_initialize
 
 void network_initialize() {
-  MUTEX_INIT(mutex);
+  easy_mutex_init(&mutex, NULL);
   #ifdef UNIX
     signal(SIGPIPE, SIG_IGN);
   #endif
@@ -116,13 +99,13 @@ static void *thread(void *parameter) {
       network_error_string = custom_error_string;
       printf("%s\n", custom_error_string);
     };
-    MUTEX_LOCK(mutex);
+    easy_mutex_lock(&mutex);
     if ((*the_socket)->cancel) {
       free_socket(the_socket);
     } else {
       (*the_socket)->status = SERVER_STATUS_ERROR;
     };
-    MUTEX_UNLOCK(mutex);
+    easy_mutex_unlock(&mutex);
     return NULL;
   };
 
@@ -175,13 +158,13 @@ static void *thread(void *parameter) {
       #endif
       printf("Connection successfully established.\n");
       network_last_response = on_frame_time;
-      MUTEX_LOCK(mutex);
+      easy_mutex_lock(&mutex);
       if ((*the_socket)->cancel) {
         free_socket(the_socket);
       } else {
         (*the_socket)->status = SERVER_STATUS_CONNECTED;
       };
-      MUTEX_UNLOCK(mutex);
+      easy_mutex_unlock(&mutex);
       freeaddrinfo(results);
       return NULL;
     };
@@ -190,13 +173,13 @@ static void *thread(void *parameter) {
 
   // Errors suck!
 
-  MUTEX_LOCK(mutex);
+  easy_mutex_lock(&mutex);
   if ((*the_socket)->cancel) {
     free_socket(the_socket);
   } else {
     (*the_socket)->status = SERVER_STATUS_ERROR;
   };
-  MUTEX_UNLOCK(mutex);
+  easy_mutex_unlock(&mutex);
   freeaddrinfo(results);
   return NULL;
 };
@@ -248,7 +231,7 @@ void *network_initiate_connect(struct structure_socket_data **the_socket, char *
   // Since DNS lookups seemingly require a thread in order to be non-blocking,
   // I'm just going to do the entire connect sequence in a thread.  Fuck me!
 
-  thread_create(thread, (void *) *the_socket);
+  easy_thread_fork(&thread_state, thread, (void *) *the_socket);
 
   DEBUG("leave network_initiate_connect()");
 };
@@ -261,7 +244,7 @@ void *network_initiate_connect(struct structure_socket_data **the_socket, char *
 void network_free_socket(struct structure_socket_data **the_socket) {
   DEBUG("enter network_free_socket()");
 
-  MUTEX_LOCK(mutex);
+  easy_mutex_lock(&mutex);
   if (*the_socket != NULL) {
     if ((*the_socket)->status == SERVER_STATUS_CONNECTING) {
       (*the_socket)->cancel = 1;
@@ -270,7 +253,7 @@ void network_free_socket(struct structure_socket_data **the_socket) {
       free_socket(the_socket);
     };
   };
-  MUTEX_UNLOCK(mutex);
+  easy_mutex_unlock(&mutex);
 
   DEBUG("leave network_free_socket()");
 };

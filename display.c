@@ -13,7 +13,7 @@ int display_window_width, display_window_height;
 
 //--page-split-- display_open_window
 
-void display_open_window() {
+void display_open_window(void) {
   extern char data_wallpaper_png; extern int size_wallpaper_png;
   background = texture_load(&data_wallpaper_png, size_wallpaper_png, 0);
   background_width = texture_width;
@@ -26,13 +26,13 @@ void display_open_window() {
 
 //--page-split-- display_close_window
 
-void display_close_window() {
+void display_close_window(void) {
   glDeleteTextures(1, &background);
 };
 
 //--page-split-- display_background_image
 
-void display_background_image() {
+void display_background_image(void) {
 
   glMatrixMode(GL_PROJECTION); glLoadIdentity();
   glMatrixMode(GL_MODELVIEW); glLoadIdentity();
@@ -44,7 +44,7 @@ void display_background_image() {
   glEnable(GL_TEXTURE_2D);
 
   double tx, ty, offset;
-  if (server_address != NULL && !strcmp(server_address, PORTAL_ADDRESS)) {
+  if (server_address != NULL && !strcmp(server_address, server_portal_address)) {
     glBindTexture(GL_TEXTURE_2D, portal + RENDER_IN_GRAYSCALE);
     tx = 0.5 * display_window_width / portal_width;
     ty = 0.5 * display_window_height / portal_height;
@@ -67,7 +67,7 @@ void display_background_image() {
 
 //--page-split-- display_render
 
-void display_render() {
+void display_render(void) {
   DEBUG("enter display_render()");
 
   chat_color_cycle_index = 0;

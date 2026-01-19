@@ -53,7 +53,7 @@ void menus_chat() {
 
   static int cursor = 0;
   menu_object_data[menu_object_index+1][0] = cursor;
-  int submit = gui_input(1, gui_text_lines - 3, gui_text_columns - 8, MAX_CHAT, chat, MENU_FLAG_OFFSET);
+  int submit = gui_input(1, gui_text_lines - 3, gui_text_columns - 8, MAX_CHAT, chat, MENU_FLAG_OFFSET) == 2;
   cursor = menu_object_data[menu_object_index][0];
 
   int length = strlen(chat);

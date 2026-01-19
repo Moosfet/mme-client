@@ -60,8 +60,8 @@
 #include "static/glfw3.h"
 #include "static/zlib.h"
 #else
-#include "GLFW/glfw3.h"
-#include "zlib.h"
+#include <GLFW/glfw3.h>
+#include <zlib.h>
 #endif
 
 #include "GL/glu.h"
@@ -71,6 +71,8 @@
 #include "stb_vorbis.h"
 
 #include "protocol.h"
+
+#include "easy.h"
 
 // some stuff ain't defined for Windows for some reason
 
@@ -156,8 +158,6 @@ struct int_xyzs {
 // Only "really" global macors go here.  Macros that mostly belong
 // to one file are listed along with that file's function prototypes.
 
-#define FUCK printf("\e[1;33m%s:%d\e[0m\n", __FILE__, __LINE__);
-
 #define CHECK_GL_ERROR {int error = glGetError(); if (error) printf("%s%s:%d: OpenGL error %d: %s%s\n", COLOR_ON, __FILE__, __LINE__, error, gluErrorString(error), COLOR_OFF); }
 
 #ifdef SAY_LOTSA_SHIT
@@ -171,6 +171,8 @@ struct int_xyzs {
 #endif
 
 #define RENDER_IN_GRAYSCALE (option_anaglyph_enable == 1)
+
+#define memory_allocate easy_memory_allocate
 
 //--page-split-- global variables & function prototypes
 
@@ -326,19 +328,6 @@ extern int display_window_width, display_window_height;
 void display_render();
 void display_background_image();
 void display_check_opengl_error(char * message);
-
-// easy.h
-
-void easy_fuck(char * message);
-void easy_error(char * message, int error_code);
-double easy_time();
-void easy_sleep(double seconds);
-void easy_seed_random_number_generator();
-int easy_random(int limit);
-void easy_random_binary_string(char *string, int bytes);
-void easy_random_hex_string(char *string, int length);
-void easy_binary_to_ascii(char *output, char *input, int size);
-int easy_strnlen(char *string, int limit);
 
 // error.h
 
@@ -564,15 +553,6 @@ void math_reverse_rotate_vector(struct double_xyzuv *vector);
 void math_origin_vector(struct double_xyzuv *vector);
 void math_normalize_vector(struct double_xyz *vector);
 
-// memory.h
-
-extern struct structure_rwlock memory_lock;
-
-#define memory_allocate(pointer, size) { void *d95NNwASESLjBSXFn3k2 = *(pointer); memory__allocate(&d95NNwASESLjBSXFn3k2, size, __FILE__, __LINE__); *(pointer) = d95NNwASESLjBSXFn3k2; }
-void memory__allocate(void **pointer, int size, char *file, int line);
-void memory_initialize();
-void memory_terminate();
-
 // menu.h
 
 #define MENU_MAX_OBJECTS 512
@@ -672,20 +652,11 @@ extern int menus_server_menu_active;
 extern int menus_server_menu_number;
 extern int menus_server_menu_width;
 extern int menus_server_menu_height;
-extern int menus_server_menu_submit;
 extern int menus_server_menu_options;
 void menus_server_menu_reset();
 void menus_server_menu();
 void menus_server_select();
 void menus_sound();
-
-extern int menus_server_menu_value[256];
-extern int menus_server_menu_active;
-extern int menus_server_menu_number;
-extern int menus_server_menu_width;
-extern int menus_server_menu_height;
-extern int menus_server_menu_submit;
-extern int menus_server_menu_options;
 
 extern int menus_controls_disable_function_keys;
 
@@ -869,6 +840,7 @@ extern double server_connect_time;
 extern double server_ping_time;
 extern char *server_address;
 extern char *server_authentication;
+extern char *server_portal_address;
 extern char *server_portal_authentication;
 
 void server_terminate();
@@ -1004,32 +976,3 @@ void texture_open_window();
 void texture_close_window();
 void texture_rebind();
 void texture_reset();
-
-// thread.h
-
-#ifdef WINDOWS
-  #define MUTEX HANDLE
-  #define MUTEX_INIT(i) if (NULL == (i = CreateSemaphore(NULL, 1, 1, NULL))) { printf("GetLastError() = %d\n", GetLastError()); easy_fuck("Failed to create semaphore!"); };
-  #define MUTEX_LOCK(i) if (WAIT_OBJECT_0 != WaitForSingleObject(i, INFINITE)) { printf("GetLastError() = %d\n", GetLastError()); easy_fuck("Failed to WaitForSingleObject!"); };
-  #define MUTEX_UNLOCK(i) if (!ReleaseSemaphore(i, 1, NULL)) { printf("GetLastError() = %d\n", GetLastError()); easy_fuck("Failed to release semaphore!"); };
-#else
-  #define MUTEX pthread_mutex_t
-  #define MUTEX_INIT(i) pthread_mutex_init(&i, NULL)
-  #define MUTEX_LOCK(i) pthread_mutex_lock(&i)
-  #define MUTEX_UNLOCK(i) pthread_mutex_unlock(&i)
-#endif
-
-struct structure_rwlock {
-  MUTEX change;
-  MUTEX in_use;
-  int count;
-};
-
-void thread_lock_init(struct structure_rwlock *rwlock);
-void thread_lock_read(struct structure_rwlock *rwlock);
-void thread_unlock_read(struct structure_rwlock *rwlock);
-void thread_lock_write(struct structure_rwlock *rwlock);
-void thread_unlock_write(struct structure_rwlock *rwlock);
-void thread_priority_background();
-void thread_create(void (*function(void *)), void *parameter);
-void thread_exit();

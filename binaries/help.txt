@@ -9,5 +9,11 @@ Available command-line options:
       Server address may be a domain name or an IP address, and may include a
       port number after a colon.  Example:  --server server.example.com:43444
 
+  --portal (server address)
+      Uses this portal server instead of portal.multiplayermapeditor.com.
+      This is almost identical to --server, the only difference being that
+      your saved login info will be sent to this server, and the game will
+      behave as if this is the one true login and server list server.
+
   --packets
       Displays a dump of all packets received from the map server.

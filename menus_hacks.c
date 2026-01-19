@@ -21,7 +21,7 @@ void menus_hacks() {
 
   int calculate = 0;
 
-  if (gui_input(2, 5, 4, 4, s_index, FLAGS)) {
+  if (gui_input(2, 5, 4, 4, s_index, FLAGS) == 2) {
     index = strtod(s_index, NULL);
     if (index < 0) index = 0;
     if (index > FILE_COUNT - 1) index = FILE_COUNT - 1;

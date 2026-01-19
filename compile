@@ -5,11 +5,49 @@ function error {
   exit 1;
 };
 
+check_and_fix_link() {
+  local local_file="$1"
+  local common_file="../common/$1"
+
+  # Sanity checks
+  if [ ! -e "$common_file" ]; then
+      echo "ERROR: Missing $common_file"
+      exit 1
+  fi
+
+  if [ ! -e "$local_file" ]; then
+      echo "ERROR: Missing $local_file"
+      exit 1
+  fi
+
+  # Get inode numbers
+  local local_inode
+  local common_inode
+  local_inode=$(stat -c '%i' "$local_file")
+  common_inode=$(stat -c '%i' "$common_file")
+
+  # Already hard-linked
+  if [ "$local_inode" -eq "$common_inode" ]; then
+      return 0
+  fi
+
+  # Not hard-linked; check content
+  if cmp -s "$local_file" "$common_file"; then
+    echo "NOTICE: $local_file is not hard-linked but contents match; repairing link"
+    rm -f "$local_file"
+    ln "$common_file" "$local_file"
+  else
+    echo "ERROR: $local_file differs from $common_file and is not hard-linked."
+    echo "Resolve this conflict manually before continuing."
+    exit 1
+  fi
+}
+
 #clear
 echo -ne "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
 mkdir objects 2>/dev/null
 
-COMPILE_OPTIONS="-O9 -g --fast-math -funsigned-char -Wno-unused-result -Werror -fdiagnostics-color=always -fPIE -pie"
+COMPILE_OPTIONS="-O9 -g --fast-math -funsigned-char -Wno-unused-result -Wno-format-truncation -Werror -fdiagnostics-color=always -fPIE -pie"
 LINK_OPTIONS="-fPIE -pie"
 LINK_LIBRARIES="-lm -lpthread"
 
@@ -25,6 +63,8 @@ echo "char build_compile_date[] = \"$DATE\";" >> build.c
 # if official version, add SVN revision number
 
 if [ -e .official ]; then
+  check_and_fix_link easy.h
+  check_and_fix_link easy.c
   SVN_STRING=`svnversion`
   echo "char build_svn_string[] = \"$SVN_STRING\";" >> build.c
   SVN_VERSION=`svnversion | sed s/.*:// | sed s/M//`
@@ -37,6 +77,7 @@ if [ -e .official ]; then
 else
   echo "char build_svn_string[] = \"unofficial\";" >> build.c
   echo "int build_svn_revision = 0;" >> build.c
+  echo "int build_svn_modified = 1;" >> build.c
 fi
 
 # process compile options
@@ -55,7 +96,7 @@ for i in $@; do
   if [ $i == WINDOWS ]; then
     echo "char build_target[] = \"Windows\";" >> build.c
     # -lwinmm used to be in the link libraries but doesn't seem to be needed
-    COMPILE_OPTIONS="$COMPILE_OPTIONS";
+    COMPILE_OPTIONS="-DWINDOWS $COMPILE_OPTIONS -mwindows";
     LINK_LIBRARIES="static/libz.a static/libglfw3.a $LINK_LIBRARIES -lgdi32 -lopengl32 -lglu32 -lwsock32 -lws2_32 -lole32 -ldsound"
     LINK_OPTIONS="-static $LINK_OPTIONS"
     COMPILER="x86_64-w64-mingw32-gcc"
@@ -87,7 +128,7 @@ fi
 
 # if any header files changed, delete all the object files
 
-for i in *.h; do
+for i in compile *.h; do
   if [ .clean -ot $i ]; then
     # rename the stb_*.o so they don't get deleted
     mv objects/stb_image.o objects/stb_image.oo 2>/dev/null
@@ -167,7 +208,7 @@ done
 
 # This compiles everything else if any of the header files have changed:
 
-compile alsa argument backtrace binaries block build cache chat controls cpu directsound display easy error event glfw group gui lag main map math memory menu menus_anaglyph menus_autofog menus_chat menus_controls menus_escape menus_exit menus_fencepost menus_fog menus_fps menus_graphics menus_group menus_hacks menus_help menus_misc menus_perspective menus_play menus_server_connect menus_server_disconnect menus_server_error menus_server_loading menus_server_menu menus_sound mixer model network on opengl option packet paint player projectile sanity server sha1 sky sort sound stars statistics texture thread
+compile alsa argument backtrace binaries block build cache chat controls cpu directsound display easy error event glfw group gui lag main map math menu menus_anaglyph menus_autofog menus_chat menus_controls menus_escape menus_exit menus_fencepost menus_fog menus_fps menus_graphics menus_group menus_hacks menus_help menus_misc menus_perspective menus_play menus_server_connect menus_server_disconnect menus_server_error menus_server_loading menus_server_menu menus_sound mixer model network on opengl option packet paint player projectile sanity server sha1 sky sort sound stars statistics texture
 
 # This makes the executable:
 

@@ -21,6 +21,8 @@ static WAVEFORMATEX wave_format;
 static unsigned long buffer_size = 4096;
 static unsigned long period_size = 0;  // set to buffer_size / 4 in code below...
 
+static struct easy_thread_state thread_state;
+
 #endif
 
 //--page-split-- directsound_error
@@ -34,9 +36,6 @@ static void directsound_error (char *function, const char *message) {
   memory_allocate(&directsound_error_message, length + 1);
   strcpy(directsound_error_message, message);
 };
-
-static volatile int thread_run_flag = 0;    // indicates thread was spawned
-static volatile int thread_exit_flag = 0;   // used to tell thread to exit
 
 #endif
 
@@ -72,96 +71,6 @@ static char * directsound_strerror(int ret) {
 
 #endif
 
-//--page-split-- directsound_initialize
-
-#ifdef WINDOWS
-
-void directsound_initialize() {
-
-  printf("DirectSound buffer size is %d\n", buffer_size);
-  period_size = buffer_size / 4;
-
-  printf ("directsound init\n");
-  write_offset = 0;
-  wave_format.wFormatTag = WAVE_FORMAT_PCM;
-  wave_format.nChannels = 2;
-  wave_format.nSamplesPerSec = 44100;
-  wave_format.wBitsPerSample = 16;
-  wave_format.nBlockAlign = wave_format.nChannels * wave_format.wBitsPerSample / 8;
-  wave_format.nAvgBytesPerSec = wave_format.nSamplesPerSec * wave_format.nBlockAlign;
-  wave_format.cbSize = sizeof (wave_format);
-
- // buffer_size = wave_format.nAvgBytesPerSec * 2;
-
-  directsound_error_function = NULL;
-
-  CoInitialize( NULL );
-  HRESULT ret = DirectSoundCreate(NULL, &direct_sound, NULL);
-  if (ret != DS_OK) {
-    directsound_error("DirectSoundCreate()", directsound_strerror(ret));
-    return;
-
-  }
-
-  // GetDesktopWindow() should be replaced with our window handle, but I couldn't find a way
-  // to get GLFW to tell me what it is, so this is what you get
-  ret = direct_sound->lpVtbl->SetCooperativeLevel(direct_sound, GetDesktopWindow(), DSSCL_NORMAL );
-  if (ret != DS_OK) {
-    directsound_error("SetCooperativeLevel()", directsound_strerror(ret));
-    return;
-  }
-
-  // Removed DSBCAPS_GETCURRENTPOSITION2 | DSCBCAPS_WAVEMAPPED  for XP compatability.
-
-  DSBUFFERDESC buffer_description;
-  buffer_description.dwSize = sizeof(DSBUFFERDESC);
-  buffer_description.dwFlags = DSBCAPS_GLOBALFOCUS; // | DSBCAPS_CTRLPAN;
-  buffer_description.dwBufferBytes = 4 * buffer_size;
-  buffer_description.lpwfxFormat = &wave_format;
-  buffer_description.dwReserved = 0;
-
-  if ((ret = direct_sound->lpVtbl->CreateSoundBuffer(direct_sound, &buffer_description, &sound_buffer, 0)) != DS_OK) {
-      directsound_error("CreateSoundBuffer()", directsound_strerror(ret));
-      return;
-  }
-
-  if ((ret = sound_buffer->lpVtbl->GetFormat(sound_buffer, &wave_format, sizeof( WAVEFORMATEX ), NULL)) != DS_OK) {
-      directsound_error("GetFormat()", directsound_strerror(ret));
-      return;
-  }
-
-  printf ("format: %d\nchannels: %d\nsamples per sec: %i\navg bytes/sec: %i\nblock align: %i\nbits per sample: %i\ncbsize: %i\n"
-            , wave_format.wFormatTag, wave_format.nChannels, wave_format.nSamplesPerSec, wave_format.nAvgBytesPerSec, wave_format.nBlockAlign,
-            wave_format.wBitsPerSample, wave_format.cbSize);
-
-  if ((ret = sound_buffer->lpVtbl->Play(sound_buffer, 0, 0, DSBPLAY_LOOPING )) != DS_OK) {
-      directsound_error("Play()", directsound_strerror(ret));
-      return;
-  }
-
-  thread_run_flag = 1;
-  thread_exit_flag = 0;
-  thread_create(directsound_output_thread, NULL);
-};
-
-#endif
-
-//--page-split-- directsound_terminate
-
-#ifdef WINDOWS
-
-void directsound_terminate() {
-
-  if (thread_run_flag) {
-    thread_exit_flag = 1;
-    while (thread_run_flag) easy_sleep(0.001);
-  };
-
-  sound_buffer->lpVtbl->Stop(sound_buffer);
-};
-
-#endif
-
 //--page-split-- directsound_output_thread
 
 #ifdef WINDOWS
@@ -176,7 +85,10 @@ static void *directsound_output_thread(void *argument) {
 
   DWORD last_write_position = 0;
 
-  while (!thread_exit_flag) {
+  easy_thread_set_init_flag(&thread_state);
+
+  while (!easy_thread_get_exit_flag(&thread_state)) {
+
     PBYTE locked_buffer = NULL;
     DWORD locked_buffer_size = 0;
     PBYTE locked_buffer2 = NULL;
@@ -263,9 +175,94 @@ static void *directsound_output_thread(void *argument) {
   memory_allocate(&float_buffer, 0);
   memory_allocate(&short_buffer, 0);
 
-  thread_run_flag = 0;
+};
 
-  thread_exit();
+#endif
+
+//--page-split-- directsound_initialize
+
+#ifdef WINDOWS
+
+void directsound_initialize() {
+
+  printf("DirectSound buffer size is %d\n", buffer_size);
+  period_size = buffer_size / 4;
+
+  printf ("directsound init\n");
+  write_offset = 0;
+  wave_format.wFormatTag = WAVE_FORMAT_PCM;
+  wave_format.nChannels = 2;
+  wave_format.nSamplesPerSec = 44100;
+  wave_format.wBitsPerSample = 16;
+  wave_format.nBlockAlign = wave_format.nChannels * wave_format.wBitsPerSample / 8;
+  wave_format.nAvgBytesPerSec = wave_format.nSamplesPerSec * wave_format.nBlockAlign;
+  wave_format.cbSize = sizeof (wave_format);
+
+ // buffer_size = wave_format.nAvgBytesPerSec * 2;
+
+  directsound_error_function = NULL;
+
+  CoInitialize( NULL );
+  HRESULT ret = DirectSoundCreate(NULL, &direct_sound, NULL);
+  if (ret != DS_OK) {
+    directsound_error("DirectSoundCreate()", directsound_strerror(ret));
+    return;
+
+  }
+
+  // GetDesktopWindow() should be replaced with our window handle, but I couldn't find a way
+  // to get GLFW to tell me what it is, so this is what you get
+  ret = direct_sound->lpVtbl->SetCooperativeLevel(direct_sound, GetDesktopWindow(), DSSCL_NORMAL );
+  if (ret != DS_OK) {
+    directsound_error("SetCooperativeLevel()", directsound_strerror(ret));
+    return;
+  }
+
+  // Removed DSBCAPS_GETCURRENTPOSITION2 | DSCBCAPS_WAVEMAPPED  for XP compatability.
+
+  DSBUFFERDESC buffer_description;
+  buffer_description.dwSize = sizeof(DSBUFFERDESC);
+  buffer_description.dwFlags = DSBCAPS_GLOBALFOCUS; // | DSBCAPS_CTRLPAN;
+  buffer_description.dwBufferBytes = 4 * buffer_size;
+  buffer_description.lpwfxFormat = &wave_format;
+  buffer_description.dwReserved = 0;
+
+  if ((ret = direct_sound->lpVtbl->CreateSoundBuffer(direct_sound, &buffer_description, &sound_buffer, 0)) != DS_OK) {
+      directsound_error("CreateSoundBuffer()", directsound_strerror(ret));
+      return;
+  }
+
+  if ((ret = sound_buffer->lpVtbl->GetFormat(sound_buffer, &wave_format, sizeof( WAVEFORMATEX ), NULL)) != DS_OK) {
+      directsound_error("GetFormat()", directsound_strerror(ret));
+      return;
+  }
+
+  printf ("format: %d\nchannels: %d\nsamples per sec: %i\navg bytes/sec: %i\nblock align: %i\nbits per sample: %i\ncbsize: %i\n"
+            , wave_format.wFormatTag, wave_format.nChannels, wave_format.nSamplesPerSec, wave_format.nAvgBytesPerSec, wave_format.nBlockAlign,
+            wave_format.wBitsPerSample, wave_format.cbSize);
+
+  if ((ret = sound_buffer->lpVtbl->Play(sound_buffer, 0, 0, DSBPLAY_LOOPING )) != DS_OK) {
+      directsound_error("Play()", directsound_strerror(ret));
+      return;
+  }
+
+  easy_thread_fork(&thread_state, directsound_output_thread, NULL);
+  easy_thread_wait_init_flag(&thread_state);
+
+};
+
+#endif
+
+//--page-split-- directsound_terminate
+
+#ifdef WINDOWS
+
+void directsound_terminate() {
+
+  easy_thread_set_exit_flag(&thread_state);
+  easy_thread_join(&thread_state);
+
+  sound_buffer->lpVtbl->Stop(sound_buffer);
 
 };
 

@@ -8,7 +8,6 @@ int menus_server_menu_active = 0;
 int menus_server_menu_number = 0;
 int menus_server_menu_width = 0;
 int menus_server_menu_height = 0;
-int menus_server_menu_submit = 0;
 int menus_server_menu_options = 0;
 
 #define type menus_server_menu_data[i].type
@@ -88,7 +87,6 @@ static void send_form_data() {
 
 void menus_server_menu_reset() {
   menus_server_menu_active = 0;
-  menus_server_menu_submit = 0;
   for (int i = 0; i < MENU_MAX_OBJECTS - 1; i++) {
     type = MENU_NONE;
     if (text != NULL) memory_allocate(&text, 0);
@@ -177,7 +175,8 @@ void menus_server_menu() {
         };
       };
     } else if (type == MENU_INPUT || type == MENU_PASSWORD) {
-      if (gui_input(column, line, width, length, text, flags)) {
+      int result = gui_input(column, line, width, length, text, flags);
+      if (result) {
         if (flags & MENU_FLAG_LIVE) {
           if (type == MENU_PASSWORD) {
             // Don't send anything.  They don't need to know.
@@ -186,7 +185,7 @@ void menus_server_menu() {
           };
         };
       };
-      if (menus_server_menu_submit) {
+      if ((flags & MENU_FLAG_ACTIVE) && result == 2) {
         send_form_data();
         if (type == MENU_PASSWORD) {
           salt_password(i, MENU_FLAG_ACTIVE);

@@ -24,7 +24,7 @@ void menus_anaglyph() {
   int small_blocks = map_data.resolution.x < 0.1625;
 
   if (menu_process_event && KEY_PRESS_EVENT && KEY == GLFW_KEY_ESCAPE) apply(), menu_switch(menus_escape);
-  if (gui_window(76, 18, 3)) apply(), menu_switch(menus_play);
+  if (gui_window(76, 19, 3)) apply(), menu_switch(menus_play);
 
   gui_text(1, 0, "3D Anaglyph Configuration");
   int line = 2;
@@ -54,18 +54,18 @@ void menus_anaglyph() {
   };
 
   gui_text(1, line, "Current width of the game window:");
-  if (gui_input(36, line, 12, 12, one, NO_FLAGS)) apply();
+  if (gui_input(36, line, 12, 12, one, NO_FLAGS) == 2) apply();
   gui_text(51, line, "Measurement Units:");
   line++;
   line++;
   gui_text(1, line, "Distance from eyes to the screen:");
-  if (gui_input(36, line, 12, 12, two, NO_FLAGS)) apply();
+  if (gui_input(36, line, 12, 12, two, NO_FLAGS) == 2) apply();
   gui_radio(55, line, &option_anaglyph_units, 0, "Centimeters");
   line++;
   gui_radio(55, line, &option_anaglyph_units, 1, "Inches");
   line++;
   gui_text(1, line, "Distance between your pupils:");
-  if (gui_input(36, line, 12, 12, three, NO_FLAGS)) apply();
+  if (gui_input(36, line, 12, 12, three, NO_FLAGS) == 2) apply();
   line++;
   line++;
                      // xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -85,8 +85,9 @@ void menus_anaglyph() {
   };
 
   line++;
+  //if (gui_check(4, line++, &option_anaglyph_enable, 1, "Enable 3D Anaglyph Mode according to the above information.")) apply(), texture_rebind();
   if (gui_radio(4, line++, &option_anaglyph_enable, 1, "Enable 3D Anaglyph Mode according to the above information.")) apply(), texture_rebind();
-  if (gui_radio(4, line++, &option_anaglyph_enable, 2, "Do something else even more ridiculous.")) apply(), texture_rebind();
+  if (gui_radio(4, line++, &option_anaglyph_enable, 2, "Enable side-by-side rendering using the above information.")) apply(), texture_rebind();
   if (gui_radio(4, line++, &option_anaglyph_enable, 0, "Oh no!  Turn it off!  I'm going to puke!")) apply(), texture_rebind();
 
 };

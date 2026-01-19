@@ -72,15 +72,19 @@ void chat_render(int x, int y, int width, int height, int flag, int scroll_offse
           while (p[k-1] == ' ' && k > 0) k--;
           memmove(LINE0, LINE1, (width+1)*(height-1));
           memmove(CODE0, CODE1, (width+1)*(height-1));
-          strncpy(LINE9, p, k); *(LINE9 + k) = 0;
-          strncpy(CODE9, c, k); *(CODE9 + k) = 0;
+          //strncpy(LINE9, p, k); *(LINE9 + k) = 0;
+          //strncpy(CODE9, c, k); *(CODE9 + k) = 0;
+          easy_strncpy(LINE9, p, k + 1);
+          easy_strncpy(CODE9, c, k + 1);
           p += j + 1;
           c += j + 1;
         } else {
           memmove(LINE0, LINE1, (width+1)*(height-1));
           memmove(CODE0, CODE1, (width+1)*(height-1));
-          strncpy(LINE9, p, width); *(LINE9 + width) = 0;
-          strncpy(CODE9, c, width); *(CODE9 + width) = 0;
+          //strncpy(LINE9, p, width); *(LINE9 + width) = 0;
+          //strncpy(CODE9, c, width); *(CODE9 + width) = 0;
+          easy_strncpy(LINE9, p, width + 1);
+          easy_strncpy(CODE9, c, width + 1);
           p += width;
           c += width;
         };

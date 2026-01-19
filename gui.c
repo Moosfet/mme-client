@@ -735,7 +735,7 @@ int gui_input(int x, int y, int size, int length, char *string, int flags) {
   // (x, y) is location of left-most character in box.
   // size is the size of the box in characters.
   // length is the maximum length of the input.
-  // return value is true when enter is pressed
+  // return value is 1 if a change is made, 2 if enter was pressed
 
   if (size < 1) return 0;
 
@@ -840,7 +840,6 @@ int gui_input(int x, int y, int size, int length, char *string, int flags) {
         };
         if (KEY == GLFW_KEY_ENTER || KEY == GLFW_KEY_KP_ENTER) {
           menu_next_focus = menu_focus_object + 1;
-          if (flags & MENU_FLAG_ACTIVE) menus_server_menu_submit = 1;
           enter = 1;
         };
         if (KEY == GLFW_KEY_ESCAPE) {
@@ -1007,7 +1006,10 @@ int gui_input(int x, int y, int size, int length, char *string, int flags) {
   #undef lastfocus
   #undef blinktime
   if (enter) sound_play (SOUND_BUTTON_PRESS, 0.1f, NULL);
-  return enter;
+
+  if (enter) return 2;
+  if (change) return 1;
+  return 0;
 
 };
 

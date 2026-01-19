@@ -14,7 +14,7 @@ void menus_server_disconnect() {
   };
 
   if (server_status == SERVER_STATUS_DISCONNECTED) {
-    if (main_shutdown_flag || !strcmp(server_address, PORTAL_ADDRESS)) {
+    if (main_shutdown_flag || !strcmp(server_address, server_portal_address)) {
       main_shutdown();
     } else {
       memory_allocate(&server_address, 0);

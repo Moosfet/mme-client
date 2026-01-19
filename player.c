@@ -361,7 +361,6 @@ int player_get_vector(struct int_xyz *v) {
 
 void player_movement() {
   DEBUG("enter player_movement()");
-  double stride = STRIDE_WALK;
   static double last_movment_stamp = 0;
   static int start_time = 0;
   if (start_time == 0) start_time = on_frame_time;
@@ -435,19 +434,16 @@ void player_movement() {
       speed = WALKING_SPEED;
       acceleration = ACCELERATION;
       deacceleration = ACCELERATION;
-      stride = STRIDE_WALK;
     } else {
       speed = RUNNING_SPEED;
       acceleration = ACCELERATION;
       deacceleration = ACCELERATION;
-      stride = STRIDE_RUN;
     };
     //if (glfwGetKey(GLFW_KEY_LCTRL) || glfwGetKey(GLFW_KEY_RCTRL)) {
     if (controls_get_key (CONTROLS_KEY_SNEAK)) {
       speed = SNEAKING_SPEED;
       acceleration = ACCELERATION;
       deacceleration = ACCELERATION;
-      stride = STRIDE_WALK;
     }
   } else {
     //if ((glfwGetKey(GLFW_KEY_LSHIFT) || glfwGetKey(GLFW_KEY_RSHIFT)) == option_fly_fast) {
@@ -455,7 +451,6 @@ void player_movement() {
       speed = FLYING_SPEED;
       acceleration = FLYING_ACCELERATION;
       deacceleration = FLYING_ACCELERATION;
-      stride = STRIDE_WALK;
 
       // add extra deceleration if moving quickly
       if (player_allow_speedy) {
@@ -503,12 +498,28 @@ void player_movement() {
     new.y = keyboard.y;
     new.z = keyboard.z;
 
-    if (!player_fly) new.z *= viscosity;
+    if (!player_fly) {
+      if (option_superhuman) {
+        new.z *= viscosity > 0;
+      } else {
+        new.z *= viscosity;
+      };
+      if (gravity_test(player_position.x, player_position.y, player_position.z) > 0.05) {
+        if (option_superhuman) {
+          new.x *= viscosity > 0;
+          new.y *= viscosity > 0;
+        } else {
+          new.x *= viscosity;
+          new.y *= viscosity;
+        };
+      };
+    };
 
     // If the vector has a significant length, the player wants to move.
     double length = sqrt(new.x * new.x + new.y * new.y + new.z * new.z);
 
     if (length > 0.5) {
+
       // rotate the vector by the angle the player is turned to
       new.u = player_position.u; new.v = 0; math_rotate_vector(&new);
 
@@ -526,25 +537,23 @@ void player_movement() {
 
       double power = pow(viscosity, 2.0);
 
-      if (player_fly || gravity_test(player_position.x, player_position.y, player_position.z) < 0.05) {
-        // decelerate in directions orthogonal to player acceleration
-        struct double_xyzuv orthogonal = {};
-        orthogonal.x = player_velocity.y;
-        if (player_fly) {
-          orthogonal.y = player_velocity.z;
-        } else {
-          orthogonal.y = 0;
-        };
-        math_origin_vector(&orthogonal);
-        orthogonal.x -= deacceleration / fractions;
-        if (orthogonal.x < 0) orthogonal.x = 0;
-        math_rotate_vector(&orthogonal);
-        player_velocity.y = orthogonal.x;
-        if (player_fly) {
-          player_velocity.z = orthogonal.y;
-        };
-        power = 1.0;
+      // decelerate in directions orthogonal to player acceleration
+      struct double_xyzuv orthogonal = {};
+      orthogonal.x = player_velocity.y;
+      if (player_fly) {
+        orthogonal.y = player_velocity.z;
+      } else {
+        orthogonal.y = 0;
       };
+      math_origin_vector(&orthogonal);
+      orthogonal.x -= deacceleration / fractions;
+      if (orthogonal.x < 0) orthogonal.x = 0;
+      math_rotate_vector(&orthogonal);
+      player_velocity.y = orthogonal.x;
+      if (player_fly) {
+        player_velocity.z = orthogonal.y;
+      };
+      power = 1.0;
 
       // accelerate up to maximum speed
       if (player_velocity.x < speed) {
@@ -563,27 +572,27 @@ void player_movement() {
       player_velocity.u = new.u; player_velocity.v = new.v;
       math_rotate_vector(&player_velocity);
 
-    } else {
-      if (player_fly || gravity_test(player_position.x, player_position.y, player_position.z) < 0.1) {
-        // decelerate in all directions
-        struct double_xyzuv orthogonal = {};
-        orthogonal.x = player_velocity.x;
-        orthogonal.y = player_velocity.y;
-        if (player_fly) {
-          orthogonal.z = player_velocity.z;
-        } else {
-          orthogonal.z = 0;
-        };
-        math_origin_vector(&orthogonal);
-        orthogonal.x -= deacceleration / fractions;
-        if (orthogonal.x < 0) orthogonal.x = 0;
-        math_rotate_vector(&orthogonal);
-        player_velocity.x = orthogonal.x;
-        player_velocity.y = orthogonal.y;
-        if (player_fly) {
-          player_velocity.z = orthogonal.z;
-        };
+    } else if (player_fly || gravity_test(player_position.x, player_position.y, player_position.z) <= 0.05) {
+
+      // decelerate in all directions
+      struct double_xyzuv orthogonal = {};
+      orthogonal.x = player_velocity.x;
+      orthogonal.y = player_velocity.y;
+      if (player_fly) {
+        orthogonal.z = player_velocity.z;
+      } else {
+        orthogonal.z = 0;
       };
+      math_origin_vector(&orthogonal);
+      orthogonal.x -= deacceleration / fractions;
+      if (orthogonal.x < 0) orthogonal.x = 0;
+      math_rotate_vector(&orthogonal);
+      player_velocity.x = orthogonal.x;
+      player_velocity.y = orthogonal.y;
+      if (player_fly) {
+        player_velocity.z = orthogonal.z;
+      };
+
     };
 
     // Add air/water friction.
@@ -639,7 +648,7 @@ void player_movement() {
       jump_release = !jump_press;
 
       if (jump && gravity_test(player_position.x, player_position.y, player_position.z) < 0.1) {
-        player_velocity.z = 2.6 * GRAVITY_SCALE * (option_superhuman ? sqrt(3) : 1.0);
+        player_velocity.z = 2.6 * GRAVITY_SCALE * (option_superhuman ? 2.0 : 1.0);
         falling = 0.2 * fractions;
       };
 

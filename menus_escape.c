@@ -15,7 +15,7 @@ void menus_escape() {
 
   int flags;
 
-  flags = MENU_FLAG_DISABLE * !(packet_is_sendable(PACKET_MENU_REQUEST) && strcmp(server_address, PORTAL_ADDRESS));
+  flags = MENU_FLAG_DISABLE * !(packet_is_sendable(PACKET_MENU_REQUEST) && strcmp(server_address, server_portal_address));
   if (!flags) {
     if (gui_button(2, line, 25, "This Server's Menu", flags | MENU_FLAG_OFFSET)) {
       server_menu_request();
@@ -24,7 +24,7 @@ void menus_escape() {
   };
   line += 2;
 
-  flags = MENU_FLAG_DISABLE * !strcmp(server_address, PORTAL_ADDRESS);
+  flags = MENU_FLAG_DISABLE * !strcmp(server_address, server_portal_address);
   #ifdef TEST_SERVER_ONLY
     flags = MENU_FLAG_DISABLE;
   #endif

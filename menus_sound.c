@@ -18,7 +18,7 @@ void menus_sound() {
     snprintf(volume, 12, "%0.3f", option_volume); volume[12] = 0;
   };
   gui_text(1, 4, "Volume:");
-  if (gui_input(10, 4, 12, 12, volume, NO_FLAGS)) {
+  if (gui_input(10, 4, 12, 12, volume, NO_FLAGS) == 2) {
     option_volume = strtod(volume, NULL);
     if (option_volume > 100.0f) option_volume = 100.0f;
     if (option_volume < 0.001f) option_volume = 0.001f;

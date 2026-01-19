@@ -14,12 +14,47 @@ int argument_record_all_frames = 0;
 
 //--page-split-- help
 
-static void help() {
+static void help(void) {
   extern char data_help_txt; extern int size_help_txt;
   printf("\n");
   fwrite(&data_help_txt, size_help_txt, 1, stdout);
   printf("\n");
   exit(1);
+};
+
+//--page-split-- server_parse
+
+static void server_parse (char **destination, char *server) {
+  int length = strlen(server);
+  if (server[0] == '[') {
+    if (server[length-1] == ']') {
+      memory_allocate(destination, length + 7);
+      strcpy(*destination, server);
+      strcpy(*destination + length, ":44434");
+    } else {
+      memory_allocate(destination, length + 1);
+      strcpy(*destination, server);
+    };
+  } else if (strchr(server, ':') != strrchr(server, ':')) {
+    memory_allocate(destination, length + 9);
+    *destination[0] = '[';
+    strcpy(*destination + 1, server);
+    *destination[length + 1] = ']';
+    strcpy(*destination + length + 2, ":44434");
+  } else {
+    char *split = strrchr(server, ':');
+    if (split == NULL) {
+      memory_allocate(destination, length + 7);
+      strcpy(*destination, server);
+      strcpy(*destination + length, ":44434");
+    } else {
+      memory_allocate(destination, length + 1);
+      strcpy(*destination, server);
+    };
+  };
+  argument_server = 1;
+  server_action = SERVER_ACTION_CONNECT;
+  menu_function_pointer = menus_server_connect;
 };
 
 //--page-split-- argument_parse
@@ -41,39 +76,16 @@ static void argument_parse (int argc, char **argv) {
     //else if (strcmp(argv[i], "--fullscreen") == 0) argument_fullscreen = 1;
     else if (strcmp(argv[i], "--server") == 0) {
       if (i + 1 < argc) {
-        char *server = argv[++i];
-        int length = strlen(server);
-        if (server[0] == '[') {
-          if (server[length-1] == ']') {
-            memory_allocate(&server_address, length + 7);
-            strcpy(server_address, server);
-            strcpy(server_address + length, ":44434");
-          } else {
-            memory_allocate(&server_address, length + 1);
-            strcpy(server_address, server);
-          };
-        } else if (strchr(server, ':') != strrchr(server, ':')) {
-          memory_allocate(&server_address, length + 9);
-          server_address[0] = '[';
-          strcpy(server_address + 1, server);
-          server_address[length + 1] = ']';
-          strcpy(server_address + length + 2, ":44434");
-        } else {
-          char *split = strrchr(server, ':');
-          if (split == NULL) {
-            memory_allocate(&server_address, length + 7);
-            strcpy(server_address, server);
-            strcpy(server_address + length, ":44434");
-          } else {
-            memory_allocate(&server_address, length + 1);
-            strcpy(server_address, server);
-          };
-        };
-        argument_server = 1;
-        server_action = SERVER_ACTION_CONNECT;
-        menu_function_pointer = menus_server_connect;
+        server_parse(&server_address, argv[++i]);
       } else {
         printf("Option --server requires an argument.\n");
+        exit(1);
+      };
+    } else if (strcmp(argv[i], "--portal") == 0) {
+      if (i + 1 < argc) {
+        server_parse(&server_portal_address, argv[++i]);
+      } else {
+        printf("Option --protal requires an argument.\n");
         exit(1);
       };
     } else {

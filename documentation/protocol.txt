@@ -223,7 +223,7 @@ U2 maximum length of chat messages
 a box volume of 1 disallows boxes
 a box volume of 0 disallows building altogether
 
-When using multiple dimension limits, the first limit applies to the largest dimension, the second to the second largest, the third to the smallest.  
+When using multiple dimension limits, the first limit applies to the largest dimension, the second to the second largest, the third to the smallest.
 
 Chat message limit length counts only what they player types, and does not include their name or anything else.
 
@@ -263,7 +263,7 @@ No map data is included in this packet, nor does this packet activate the "map l
 
 PACKET_MAP_PROPERTIES 15 (8)
 
-This packet sets various properties of the map, without resetting the map data.  Changing these properties will, however, require all map chunks to be recompiled, so you should not sent this packet often.  Like, send it once, after sending PACKET_MAP_SETUP, and perhaps again if you want to change the map scale or something.  
+This packet sets various properties of the map, without resetting the map data.  Changing these properties will, however, require all map chunks to be recompiled, so you should not sent this packet often.  Like, send it once, after sending PACKET_MAP_SETUP, and perhaps again if you want to change the map scale or something.
 
 U4 bit mask of binary attributes
   bit 0 - removed feature - always set to zero
@@ -451,7 +451,7 @@ Flag bits:
     11 - sunlight source
   5: draw between - explained in more detail below
 
-The "draw reverse" option applies to transparent blocks.  Normally, when looking through transparent blocks, you'll see only the block faces which are air -> block transistions, and not the ones that are block -> air transistions.  Setting this bit causes the block -> air transistions to be visible as well.  This is what you will want in most cases, but in some cases it is undesirable, and so this bit controls the behavior.  Note that, even with this option enabled, if a transparent block is placed against a non-transparent block of a different type, the non-transparent block's texture will be rendered instead of this block's reverse texture.  
+The "draw reverse" option applies to transparent blocks.  Normally, when looking through transparent blocks, you'll see only the block faces which are air -> block transistions, and not the ones that are block -> air transistions.  Setting this bit causes the block -> air transistions to be visible as well.  This is what you will want in most cases, but in some cases it is undesirable, and so this bit controls the behavior.  Note that, even with this option enabled, if a transparent block is placed against a non-transparent block of a different type, the non-transparent block's texture will be rendered instead of this block's reverse texture.
 
 The "draw between" option also applies to transparent blocks.  Normally, when two transparent blocks of the same block number are adjecent to each other, no texture is drawn between them.  This makes sense for almost every use case and so this option shouldn't be enabled except when necessary as it creates a block which is easily abused to slow rendering the map merely by creating large cuboids of the block.  One example of a necessary use case is a transparent "tall grass" texture which is to be placed over top of ordinary flat grass, which has a grass texture on its four sides, but is invisible on its top and bottom sides.  In this case it is necessary to see all of the faces between adjecent grass blocks, otherwise with a 10x10 area of this block on the ground, all you see is the 10x10 peremeter of the area, and inside that area you do not see the block at all.
 
@@ -744,7 +744,7 @@ U1 collision type
 U1 thing id
 
 After the client has fired a projectile, it will send this message to indicate that the projectile has hit either a solid block, or a player.  Projectiles otherwise provide no feedback when flying outside of the map boundries.
-Also, collision feedback will only come from the client which originated the projectile.  
+Also, collision feedback will only come from the client which originated the projectile.
 
 The packet contains the type of projectile, which is determined by which mouse
 button was used to create it. The packet also includes the x, y, and z coordinates of where the projectile collided, as well as the type of collision (block or player model).  The thing id will contain either the block type which was hit, or the id of the player model.

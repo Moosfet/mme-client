@@ -13,12 +13,12 @@ struct mixer_table {
 
 static struct mixer_table table[MAX_SOUNDS] = {};
 
-static MUTEX table_access;
+static pthread_mutex_t table_access_mutex;
 
 //--page-split-- mixer_initialize
 
 void mixer_initialize() {
-  MUTEX_INIT(table_access);
+  easy_mutex_init(&table_access_mutex, 0);
   memset(table, 0, sizeof(table));
 };
 
@@ -29,7 +29,7 @@ void mixer_initialize() {
 
 void mixer_generate(float *buffer, int frames) {
 
-  MUTEX_LOCK(table_access);
+  easy_mutex_lock(&table_access_mutex);
 
   for (int i = 0; i < MAX_SOUNDS; i++) {
     if (!table[i].count) continue;
@@ -103,7 +103,7 @@ void mixer_generate(float *buffer, int frames) {
 
   };
 
-  MUTEX_UNLOCK(table_access);
+  easy_mutex_unlock(&table_access_mutex);
 
 };
 
@@ -130,7 +130,7 @@ void mixer_play(short *buffer, int count, float volume, struct double_xyz *locat
   int slot = -1;
   float lowest = v;
 
-  MUTEX_LOCK(table_access);
+  easy_mutex_lock(&table_access_mutex);
 
   for (int i = 0; i < MAX_SOUNDS; i++) {
     if (!table[i].count) {
@@ -156,6 +156,6 @@ void mixer_play(short *buffer, int count, float volume, struct double_xyz *locat
     };
   };
 
-  MUTEX_UNLOCK(table_access);
+  easy_mutex_unlock(&table_access_mutex);
 
 };

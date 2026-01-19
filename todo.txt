@@ -1,12 +1,14 @@
 short-term:
 
   finish making mode keys configurable
+  player skins in anaglyph mode
   lights aren't b&w in anaglyph mode
   better mouse settings
   network error messages
   add descent-like flying
   make all the menus smaller
   larger chunks?
+  64-bit time
 
 long-term:
 

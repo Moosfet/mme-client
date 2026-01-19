@@ -87,7 +87,7 @@ void menus_fencepost() {
     int length = 0;
 
     //snprintf(string, MAX + 1, " Spacing options for %d length fence with %d wide posts: ", total, post); string[MAX + 1] = 0;
-    snprintf(string, MAX + 1, " Spacing options: "); string[MAX + 1] = 0;
+    snprintf(string, MAX + 1, " Spacing options: "); string[MAX] = 0;
     //gui_text(1, line++, string);
 
     //string[0] = 0;

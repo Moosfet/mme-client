@@ -12,6 +12,8 @@ static snd_pcm_uframes_t period_size = 256;
 static snd_output_t *output = NULL;
 static snd_pcm_t *pcm_handle;
 
+static struct easy_thread_state thread_state;
+
 #endif
 
 //--page-split-- alsa_error
@@ -25,9 +27,6 @@ static void alsa_error (char *function, const char *message) {
   memory_allocate(&alsa_error_message, length + 1);
   strcpy(alsa_error_message, message);
 };
-
-static volatile int thread_run_flag = 0;    // indicates thread was spawned
-static volatile int thread_exit_flag = 0;   // used to tell thread to exit
 
 #endif
 
@@ -47,7 +46,9 @@ static void *pcm_output_thread(void *argument) {
   memory_allocate(&float_buffer, 2 * period_size * sizeof(float));
   memory_allocate(&short_buffer, 2 * period_size * sizeof(short));
 
-  while (!thread_exit_flag) {
+  easy_thread_set_init_flag(&thread_state);
+
+  while (!easy_thread_get_exit_flag(&thread_state)) {
 
     // generate some audio...
 
@@ -107,10 +108,6 @@ static void *pcm_output_thread(void *argument) {
 
   memory_allocate(&float_buffer, 0);
   memory_allocate(&short_buffer, 0);
-
-  thread_run_flag = 0;
-
-  thread_exit();
 
 };
 
@@ -207,9 +204,8 @@ void alsa_initialize() {
 
   snd_pcm_dump(pcm_handle, output);  // dump some shit to the screen
 
-  thread_run_flag = 1;
-  thread_exit_flag = 0;
-  thread_create(pcm_output_thread, NULL);
+  easy_thread_fork(&thread_state, pcm_output_thread, NULL);
+  easy_thread_wait_init_flag(&thread_state);
 
 };
 
@@ -223,10 +219,8 @@ void alsa_terminate() {
 
   int error;
 
-  if (thread_run_flag) {
-    thread_exit_flag = 1;
-    while (thread_run_flag) easy_sleep(0.001);
-  };
+  easy_thread_set_exit_flag(&thread_state);
+  easy_thread_join(&thread_state);
 
   error = snd_pcm_close(pcm_handle);
   if (error < 0) alsa_error("snd_pcm_close()", snd_strerror(error));

@@ -43,16 +43,13 @@ void menus_fps() {
 
   static char fps_text[16] = {27};
   if (fps_text[0] == 27) {
-    if (option_custom_fps == 0) {
-      fps_text[0] = 0;
-    } else {
-      snprintf(fps_text, 5, "%d", option_custom_fps);
-      fps_text[3] = 0;
-    };
+    snprintf(fps_text, 5, "%d", option_custom_fps);
+    fps_text[4] = 0;
   };
   gui_radio(44, 3, &option_fps_limit, 1, "custom");
   gui_input(45, 5, 4, 4, fps_text, FLAGS);
   option_custom_fps = atoi(fps_text);
+  if (option_custom_fps < 1) option_custom_fps = 1;
 
   if (option_fog_distance == 0) {
     if (option_fps_limit == 1) {

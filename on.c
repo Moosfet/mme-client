@@ -20,10 +20,14 @@ void on_program_start(int argc, char **argv) {
   backtrace_initialize();
   #endif
 
-  memory_initialize();
+  easy_initialize();
   cpu_initialize();
 
+  easy_strcpy(&server_portal_address, PORTAL_ADDRESS);
+
   argument_check(argc, argv);
+  printf("server: '%s'\n", server_address);
+  printf("portal: '%s'\n", server_portal_address);
 
   #ifdef UNIX
     chdir(getenv("HOME"));
@@ -73,7 +77,7 @@ void on_program_start(int argc, char **argv) {
 
 //--page-split-- on_program_exit
 
-void on_program_exit() {
+void on_program_exit(void) {
   DEBUG("Beginning termination procedures...");
 
   server_terminate();
@@ -83,10 +87,8 @@ void on_program_exit() {
 
   #ifdef TEST
   lag_terminate();
-  if (!argument_lag) {
-    memory_terminate();
-  };
   #endif
+  easy_terminate();
 
   DEBUG("Finished termination procedures...");
 };
@@ -95,7 +97,7 @@ double on_frame_time = 0;
 
 //--page-split-- on_frame
 
-void on_frame() {
+void on_frame(void) {
 
   #ifdef GRIEF
     if (map_initialization_flag) {
@@ -273,12 +275,9 @@ void on_frame() {
 
 };
 
-// Switching between fullscreen and window requires re-initialization
-// of all OpenGL data.  Thus, on_open_window() and on_close_window().
-
 //--page-split-- on_open_window
 
-void on_open_window() {
+void on_open_window(void) {
   CHECK_GL_ERROR;
 
   glfw_open_window();       CHECK_GL_ERROR;
@@ -298,7 +297,7 @@ void on_open_window() {
 
 //--page-split-- on_close_window
 
-void on_close_window() {
+void on_close_window(void) {
   CHECK_GL_ERROR;
 
   texture_close_window();   CHECK_GL_ERROR;
@@ -313,7 +312,7 @@ void on_close_window() {
 
 //--page-split-- on_map_load
 
-void on_map_load() {
+void on_map_load(void) {
   DEBUG("enter on_map_load()");
 
   model_reset();
@@ -333,7 +332,7 @@ void on_map_load() {
 
 //--page-split-- on_map_unload
 
-void on_map_unload() {
+void on_map_unload(void) {
   DEBUG("enter on_map_unload()");
 
   map_cease_render();
@@ -350,7 +349,7 @@ void on_map_unload() {
 
 //--page-split-- on_server_connect
 
-void on_server_connect() {
+void on_server_connect(void) {
   DEBUG("enter on_server_connect()");
 
   server_connect_time = on_frame_time;
@@ -373,7 +372,7 @@ void on_server_connect() {
 
 //--page-split-- on_server_disconnect
 
-void on_server_disconnect() {
+void on_server_disconnect(void) {
   DEBUG("enter on_server_disconnect()");
 
   server_connect_time = -1.0;

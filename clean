@@ -1,4 +1,4 @@
 #!/bin/bash
 
-rm .options objects/*.o binaries.c convert_binaries_to_c_source
+rm .options objects/*.o binaries.c convert_binaries_to_c_source mme mme.exe
 touch .clean
