@@ -2,7 +2,7 @@
 
 //--page-split-- menus_server_disconnect
 
-void menus_server_disconnect() {
+void menus_server_disconnect(void) {
 
   lag_push(1, "menus_disconnect()");
 

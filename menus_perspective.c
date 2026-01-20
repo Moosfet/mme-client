@@ -2,7 +2,7 @@
 
 //--page-split-- menus_perspective
 
-void menus_perspective() {
+void menus_perspective(void) {
 
   if (menu_process_event && KEY_PRESS_EVENT && KEY == GLFW_KEY_ESCAPE) menu_switch(menus_escape);
   if (gui_window(74, 16, 3)) menu_switch(menus_play);

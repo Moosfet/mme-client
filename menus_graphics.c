@@ -2,7 +2,7 @@
 
 //--page-split-- menus_graphics
 
-void menus_graphics() {
+void menus_graphics(void) {
 
   int small_blocks = map_data.resolution.x < 0.1625;
 

@@ -26,7 +26,7 @@ static void window_close_callback(GLFWwindow *window) {
 
 //--page-split-- glfw_capture_mouse
 
-void glfw_capture_mouse() {
+void glfw_capture_mouse(void) {
   if (!glfwGetWindowAttrib(glfw_window, GLFW_FOCUSED)) return;
   if (!glfw_mouse_capture_flag) {
     glfw_mouse_capture_flag = 1;
@@ -40,7 +40,7 @@ void glfw_capture_mouse() {
 
 //--page-split-- glfw_release_mouse
 
-void glfw_release_mouse() {
+void glfw_release_mouse(void) {
   if (glfw_mouse_capture_flag) {
     glfw_mouse_capture_flag = 0;
     glfwSetInputMode(glfw_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -52,7 +52,7 @@ void glfw_release_mouse() {
 
 //--page-split-- glfw_initialize
 
-void glfw_initialize() {
+void glfw_initialize(void) {
  glfwSetErrorCallback((GLFWerrorfun) error_callback);
   int result = glfwInit();
   if (!result) easy_fuck("glfwInit() returned a non-zero value!");
@@ -66,7 +66,7 @@ void glfw_initialize() {
 
 //--page-split-- glfw_terminate
 
-void glfw_terminate() {
+void glfw_terminate(void) {
   glfwTerminate();
 };
 
@@ -131,7 +131,7 @@ static GLFWmonitor *get_monitor_of_game_window(int x, int y, int width, int heig
 
 //--page-split-- glfw_open_window
 
-void glfw_open_window() {
+void glfw_open_window(void) {
   glfwWindowHint(GLFW_VISIBLE, GL_TRUE);
   glfwWindowHint(GLFW_MAXIMIZED, GL_FALSE);
   glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
@@ -215,7 +215,7 @@ void glfw_open_window() {
 
 //--page-split-- glfw_close_window
 
-void glfw_close_window() {
+void glfw_close_window(void) {
   glfw_fullscreen(0);
   glfwGetWindowPos(glfw_window, &option_window_location_x, &option_window_location_y);
   glfwGetWindowSize(glfw_window, &option_window_width, &option_window_height);

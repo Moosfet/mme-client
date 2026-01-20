@@ -102,7 +102,7 @@ void lag__push(int limit, const char *message) {
 
 //--page-split-- lag__pop
 
-void lag__pop() {
+void lag__pop(void) {
   if (!argument_lag) return;
   if (pthread_getspecific(key) == NULL) return;
   double start = easy_time();
@@ -130,7 +130,7 @@ void lag__pop() {
 
 //--page-split-- lag_initialize
 
-void lag_initialize() {
+void lag_initialize(void) {
   if (!argument_lag) return;
   memory_allocate(data, (++entries * sizeof(struct structure_lag_data)));
   data[0].text = "lag_push() & lag_pop()";
@@ -143,7 +143,7 @@ void lag_initialize() {
 
 //--page-split-- lag_terminate
 
-void lag_terminate() {
+void lag_terminate(void) {
   if (!argument_lag) return;
   if (entries <= 1) return;
   double subtotal[entries];

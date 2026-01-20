@@ -17,7 +17,7 @@ static void unassign_key (int key) {
 
 //--page-split-- key_select
 
-static void key_select () {
+static void key_select (void) {
 
   if (menu_process_event && KEY_PRESS_EVENT) {
     int q = KEY;
@@ -78,7 +78,7 @@ static int key_change_link (int x, int y, char *desc, int option) {
 
 //--page-split-- menus_controls
 
-void menus_controls() {
+void menus_controls(void) {
 
   if (menu_process_event && KEY_PRESS_EVENT && KEY == GLFW_KEY_ESCAPE) menu_switch(menus_escape);
   if (gui_window(78, 22, 3)) menu_switch(menus_play);

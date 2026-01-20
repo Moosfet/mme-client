@@ -51,7 +51,7 @@ static char *custom_error_string = NULL;
 
 //--page-split-- network_initialize
 
-void network_initialize() {
+void network_initialize(void) {
   easy_mutex_init(&mutex, NULL);
   #ifdef UNIX
     signal(SIGPIPE, SIG_IGN);
@@ -121,7 +121,7 @@ static void *thread(void *parameter) {
     //if (result->ai_family == AF_INET6) printf("Not attempting IPv6 connection.\n"), continue;
     return_value = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
     if (return_value == INVALID_SOCKET) {
-      printf("socket(): %s\n", error_string(SOCKET_ERROR));
+      printf("socket(): %s\n", error_string(SOCKET_ERRNO));
       if (network_error_string == NULL) network_error_string = "Unable to create socket.";
       continue;
     } else {
@@ -130,19 +130,19 @@ static void *thread(void *parameter) {
     return_value = connect((*the_socket)->socket, result->ai_addr, result->ai_addrlen);
     if (return_value == SOCKET_ERROR) {
       // We set error string here, but not STATUS_ERROR unless all connection attempts fail.
-      if (SOCKET_ERROR == ECONNREFUSED) {
+      if (SOCKET_ERRNO == ECONNREFUSED) {
         network_error_string = "The server is not accepting connections.";
-      } else if (SOCKET_ERROR == EHOSTUNREACH) {
+      } else if (SOCKET_ERRNO == EHOSTUNREACH) {
         network_error_string = "Unable to contact the server.";
-      } else if (SOCKET_ERROR == ENETUNREACH) {
+      } else if (SOCKET_ERRNO == ENETUNREACH) {
         network_error_string = "Unable to access the network.";
-      } else if (SOCKET_ERROR == ETIMEDOUT) {
+      } else if (SOCKET_ERRNO == ETIMEDOUT) {
         network_error_string = "Received no response from the server.";
-      } else if (SOCKET_ERROR == EINVAL) {
+      } else if (SOCKET_ERRNO == EINVAL) {
         network_error_string = "The connection failed for unexplained reasons.";
       } else {
         memory_allocate(&custom_error_string, 4096);
-        sprintf(custom_error_string, "connect(): %s", error_string(SOCKET_ERROR));
+        sprintf(custom_error_string, "connect(): %s", error_string(SOCKET_ERRNO));
         memory_allocate(&custom_error_string, strlen(custom_error_string) + 1);
         network_error_string = custom_error_string;
       };
@@ -285,7 +285,7 @@ int network_read(struct structure_socket_data **the_socket, char **buffer, int *
     int return_value = select(8 * sizeof(fd_set), &reads, &writes, NULL, &timeout);
     if (return_value == SOCKET_ERROR) {
       memory_allocate(&custom_error_string, 4096);
-      sprintf(custom_error_string, "select(): %s", error_string(SOCKET_ERROR));
+      sprintf(custom_error_string, "select(): %s", error_string(SOCKET_ERRNO));
       memory_allocate(&custom_error_string, strlen(custom_error_string) + 1);
       network_error_string = custom_error_string;
     };
@@ -298,11 +298,11 @@ int network_read(struct structure_socket_data **the_socket, char **buffer, int *
         return -1;
       } else if (return_value == SOCKET_ERROR) {
         (*the_socket)->status = SERVER_STATUS_ERROR;
-        if (SOCKET_ERROR == ECONNRESET || SOCKET_ERROR == ECONNABORTED) {
+        if (SOCKET_ERRNO == ECONNRESET || SOCKET_ERRNO == ECONNABORTED) {
           network_error_string = "Connection abruptly terminated!";
         } else {
           memory_allocate(&custom_error_string, 4096);
-          sprintf(custom_error_string, "recv(): %s", error_string(SOCKET_ERROR));
+          sprintf(custom_error_string, "recv(): %s", error_string(SOCKET_ERRNO));
           memory_allocate(&custom_error_string, strlen(custom_error_string) + 1);
           network_error_string = custom_error_string;
         };
@@ -330,7 +330,7 @@ int network_write(struct structure_socket_data **the_socket, char **buffer, int 
     int return_value = select(8 * sizeof(fd_set), &reads, &writes, NULL, &timeout);
     if (return_value == SOCKET_ERROR) {
       memory_allocate(&custom_error_string, 4096);
-      sprintf(custom_error_string, "select(): %s", error_string(SOCKET_ERROR));
+      sprintf(custom_error_string, "select(): %s", error_string(SOCKET_ERRNO));
       memory_allocate(&custom_error_string, strlen(custom_error_string) + 1);
       network_error_string = custom_error_string;
     };
@@ -344,11 +344,11 @@ int network_write(struct structure_socket_data **the_socket, char **buffer, int 
         return -1;
       } else if (return_value == SOCKET_ERROR) {
         (*the_socket)->status = SERVER_STATUS_ERROR;
-        if (SOCKET_ERROR == ECONNRESET || SOCKET_ERROR == ECONNABORTED) {
+        if (SOCKET_ERRNO == ECONNRESET || SOCKET_ERRNO == ECONNABORTED) {
           network_error_string = "Connection abruptly terminated!";
         } else {
           memory_allocate(&custom_error_string, 4096);
-          sprintf(custom_error_string, "send(): %s", error_string(SOCKET_ERROR));
+          sprintf(custom_error_string, "send(): %s", error_string(SOCKET_ERRNO));
           memory_allocate(&custom_error_string, strlen(custom_error_string) + 1);
           network_error_string = custom_error_string;
         };

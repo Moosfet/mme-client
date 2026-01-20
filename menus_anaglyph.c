@@ -2,7 +2,7 @@
 
 //--page-split-- menus_anaglyph
 
-void menus_anaglyph() {
+void menus_anaglyph(void) {
 
   static char one[13], two[13], three[13];
   static double one_value, two_value, three_value, last_value;

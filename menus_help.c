@@ -25,7 +25,7 @@ static char *control_choice (int key) {
 
 //--page-split-- menus_help
 
-void menus_help() {
+void menus_help(void) {
   option_hyper_help = 0;
 
   if (menu_process_event && KEY_PRESS_EVENT && KEY == GLFW_KEY_ESCAPE) menu_switch(menus_play);

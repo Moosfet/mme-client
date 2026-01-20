@@ -12,7 +12,7 @@ static char *key_name[CONTROLS_MOUSE_KEY_LIMIT];
 
 //--page-split-- controls_initialize
 
-void controls_initialize() {
+void controls_initialize(void) {
   key_name[GLFW_KEY_SPACE] = "space";
   key_name[GLFW_KEY_APOSTROPHE] = "'\"";
   key_name[GLFW_KEY_COMMA] = ",<";

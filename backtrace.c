@@ -71,7 +71,7 @@ static void sigsegv_handler (int number) {
 
 #ifdef LINUX
 
-void backtrace_initialize () {
+void backtrace_initialize (void) {
   state = backtrace_create_state(NULL, 1, error_callback, NULL);
   signal(SIGSEGV, sigsegv_handler);
 };

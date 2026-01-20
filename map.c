@@ -96,19 +96,19 @@ static const struct int_st *area;
 
 //--page-split-- map_initialize
 
-void map_initialize() {
+void map_initialize(void) {
   easy_mutex_init(&chunk_map_mutex, NULL);
 };
 
 //--page-split-- map_open_window
 
-void map_open_window() {
+void map_open_window(void) {
   map_begin_render();
 };
 
 //--page-split-- map_close_window
 
-void map_close_window() {
+void map_close_window(void) {
   map_cease_render();
 };
 
@@ -943,7 +943,7 @@ void *map_chunk_thread(void *parameter) {
 
 //--page-split-- map_begin_render
 
-void map_begin_render() {
+void map_begin_render(void) {
   if (!map_data.block) return;
   if (map_initialization_flag) map_cease_render();
   DEBUG("enter map_initialize()");
@@ -978,7 +978,7 @@ void map_begin_render() {
 
 //--page-split-- map_cease_render
 
-void map_cease_render() {
+void map_cease_render(void) {
   if (!map_initialization_flag) return;
   DEBUG("enter map_terminate()");
 
@@ -1021,7 +1021,7 @@ void map_cease_render() {
 
 //--page-split-- map_invalidate_chunks
 
-void map_invalidate_chunks() {
+void map_invalidate_chunks(void) {
   if (!map_initialization_flag) return;
   for (int i = 0; i < chunk_limit; i++) chunk_map[i] = CM_DIRTY | CM_VIRGIN;
   complete_chunks = 0;
@@ -1029,7 +1029,7 @@ void map_invalidate_chunks() {
 
 //--page-split-- map_is_active
 
-int map_is_active() {
+int map_is_active(void) {
   return map_initialization_flag;
 };
 
@@ -1076,7 +1076,7 @@ static void draw_inside(struct int_xyz c, int s) {
 
 //--page-split-- draw_cursor
 
-static void draw_cursor() {
+static void draw_cursor(void) {
 
   if (!map_selection.valid || map_cursor_color < 0) return;
 
@@ -1108,7 +1108,7 @@ struct int_xyz map_selection_dimensions;
 
 //--page-split-- draw_selection
 
-static void draw_selection() {
+static void draw_selection(void) {
 
   if (map_selection_color < 0) return;
 
@@ -1465,7 +1465,7 @@ static struct int_xyz other_side(int side, struct int_xyz block) {
 
 //--page-split-- map_mouse_test
 
-void map_mouse_test() {
+void map_mouse_test(void) {
 
   if (!map_initialization_flag) return;
 
@@ -1845,7 +1845,7 @@ static void compile_display_list(GLuint display_list, struct structure_render_li
 
 //--page-split-- map_process_a_chunk
 
-int map_process_a_chunk() {
+int map_process_a_chunk(void) {
   if (!map_initialization_flag) return 0;
 
   DEBUG("enter map_process_a_chunk()");
@@ -1970,7 +1970,7 @@ int map_process_a_chunk() {
 
 //--page-split-- map_render
 
-void map_render() {
+void map_render(void) {
 
   int do_anaglyph = option_anaglyph_enable && option_pupil_distance > 0.0;
 

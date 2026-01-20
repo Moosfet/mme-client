@@ -2,7 +2,7 @@
 
 //--page-split-- menus_escape
 
-void menus_escape() {
+void menus_escape(void) {
 
   int row_count = 8;
 

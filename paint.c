@@ -16,7 +16,7 @@ int paint_total = 0;
 
 //--page-split-- paint_reset
 
-void paint_reset() {
+void paint_reset(void) {
   paint_list_size = 0;
 };
 
@@ -55,7 +55,7 @@ static void consider(struct int_xyz c) {
 
 //--page-split-- paint_something
 
-void paint_something () {
+void paint_something (void) {
 
   while (paint_list_size && paint_total < PAINT_RATE * (on_frame_time - paint_start_time)) {
 

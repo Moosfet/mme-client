@@ -2,6 +2,6 @@
 
 //--page-split-- sanity_check
 
-void sanity_check() {
+void sanity_check(void) {
 
 };

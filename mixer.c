@@ -17,7 +17,7 @@ static pthread_mutex_t table_access_mutex;
 
 //--page-split-- mixer_initialize
 
-void mixer_initialize() {
+void mixer_initialize(void) {
   easy_mutex_init(&table_access_mutex, 0);
   memset(table, 0, sizeof(table));
 };

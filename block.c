@@ -14,7 +14,7 @@ struct structure_block_data block_data[BLOCK_MAX_BLOCKS] = {};
 
 //--page-split-- block_reset
 
-void block_reset() {
+void block_reset(void) {
   for (int i = 0; i < BLOCK_MAX_BLOCKS; i++) {
     memory_allocate(&block_data[i].comment, 0);
     block_data[i].visible = 1;

@@ -1,3 +1,5 @@
+#if 0
+
 #include "everything.h"
 
 /*
@@ -198,7 +200,7 @@ void thread_unlock_write(struct structure_rwlock *rwlock) {
 
 //--page-split-- thread_priority_background
 
-void thread_priority_background() {
+void thread_priority_background(void) {
   #ifdef WINDOWS
   if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_LOWEST)) easy_fuck("Failed to set thread priority.");
   #else
@@ -226,10 +228,12 @@ void thread_create(void (*function(void *)), void *parameter) {
 
 //--page-split-- thread_exit
 
-void thread_exit() {
+void thread_exit(void) {
   #ifdef WINDOWS
   ExitThread(0);
   #else
   pthread_exit(0);
   #endif
 };
+
+#endif

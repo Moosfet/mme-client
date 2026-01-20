@@ -23,13 +23,13 @@ int main(int argc, char **argv) {
 
 //--page-split-- main_restart
 
-void main_restart() {
+void main_restart(void) {
   main_restart_flag = 1;
 };
 
 //--page-split-- main_shutdown
 
-void main_shutdown() {
+void main_shutdown(void) {
   main_shutdown_flag = 1;
   if (server_status != SERVER_STATUS_DISCONNECTED) {
     menu_switch(menus_server_disconnect);

@@ -61,7 +61,7 @@ int option_fullscreen = 0;
 
 //--page-split-- option_key_reset
 
-void option_key_reset() {
+void option_key_reset(void) {
   memset(option_key_input, 0, sizeof(option_key_input));
   option_key_input[CONTROLS_KEY_FORWARD][0] = 'W';
   option_key_input[CONTROLS_KEY_FORWARD][1] = GLFW_KEY_UP;
@@ -95,7 +95,7 @@ void option_key_reset() {
 
 //--page-split-- option_load
 
-void option_load() {
+void option_load(void) {
 
   option_fps_limit = 60;
   option_fps_goal = 20;
@@ -274,7 +274,7 @@ void option_load() {
 
 //--page-split-- option_save
 
-void option_save() {
+void option_save(void) {
 
   FILE *file;
   char buffer[OPTION_SIZE] = {};

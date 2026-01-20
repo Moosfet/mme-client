@@ -2,7 +2,7 @@
 
 //--page-split-- menus_server_connect
 
-void menus_server_connect() {
+void menus_server_connect(void) {
 
   lag_push(1, "menus_server_connect()");
 

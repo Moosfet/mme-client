@@ -2,7 +2,7 @@
 
 //--page-split-- menus_misc
 
-void menus_misc() {
+void menus_misc(void) {
 
   if (menu_process_event && KEY_PRESS_EVENT && KEY == GLFW_KEY_ESCAPE) menu_switch(menus_escape);
   if (gui_window(40, 12, 3)) menu_switch(menus_play);

@@ -1,3 +1,7 @@
+// this isn't even used anymore is it?
+
+#if 0
+
 #include "everything.h"
 
 struct memory_double_linked_list {
@@ -39,7 +43,7 @@ static int peak_malloc_size = 0;
 
 //--page-split-- canary_test
 
-static void canary_test() {
+static void canary_test(void) {
   lag_push(1, "canary_test()");
   thread_lock_read(&memory_lock);
   for (void *pointer = next(first); pointer != last; pointer = next(pointer)) {
@@ -54,7 +58,7 @@ static void canary_test() {
 
 //--page-split-- check_total
 
-static void check_total() {
+static void check_total(void) {
   if (total_malloc_size > peak_malloc_size) {
     peak_malloc_size = total_malloc_size;
   };
@@ -133,7 +137,7 @@ static int report_flag = 0;
 
 //--page-split-- memory_initialize
 
-void memory_initialize() {
+void memory_initialize(void) {
   thread_lock_init(&memory_lock);
 };
 
@@ -141,7 +145,7 @@ void memory_initialize() {
 
 //--page-split-- memory_terminate
 
-void memory_terminate() {
+void memory_terminate(void) {
   thread_lock_read(&memory_lock);
   printf("Memory leak report:\n");
   int total = 0;
@@ -152,4 +156,6 @@ void memory_terminate() {
   printf("Total memory leak: %d bytes\n", total);
   thread_unlock_read(&memory_lock);
 };
+#endif
+
 #endif

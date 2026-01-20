@@ -25,7 +25,7 @@ static int chunk_percent = 0;
 
 //--page-split-- statistics_count_frame
 
-void statistics_count_frame() {
+void statistics_count_frame(void) {
   frame_count++;
 
   // Also, we will determine what statistics to display!
@@ -124,7 +124,7 @@ void statistics_count_frame() {
 
 //--page-split-- statistics_count_chunk
 
-void statistics_count_chunk() {
+void statistics_count_chunk(void) {
   chunk_count++;
 };
 
@@ -143,7 +143,7 @@ void statistics_complete_chunks(int count, int total) {
 
 //--page-split-- statistics_open_window
 
-void statistics_open_window() {
+void statistics_open_window(void) {
   // Figure out if our OpenGL is limiting our frame rate...
 
   #ifdef WINDOWS

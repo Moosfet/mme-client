@@ -40,7 +40,7 @@ static int background_height;
 
 //--page-split-- gui_open_window
 
-void gui_open_window() {
+void gui_open_window(void) {
   extern char data_gui_png; extern int size_gui_png;
   extern char data_old_font_png; extern int size_old_font_png;
   extern char data_new_font_png; extern int size_new_font_png;
@@ -55,7 +55,7 @@ void gui_open_window() {
 
 //--page-split-- gui_close_window
 
-void gui_close_window() {
+void gui_close_window(void) {
 
   glDeleteTextures(1, &widgets);
   glDeleteTextures(1, &old_letters);

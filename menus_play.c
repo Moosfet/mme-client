@@ -89,7 +89,7 @@ static int check_box_size(struct int_xyz one, struct int_xyz two) {
 
 //--page-split-- menus_play_reset
 
-void menus_play_reset() {
+void menus_play_reset(void) {
   map_selection_color = -1;
   menus_play_create_type = 1;
   mode = 2; step = 0;
@@ -102,7 +102,7 @@ void menus_play_reset() {
 
 //--page-split-- menus_play_focus_lost
 
-void menus_play_focus_lost() {
+void menus_play_focus_lost(void) {
   if (mode == 2 && step == 1) {
     map_selection_color = -1;
     step = 0;
@@ -119,7 +119,7 @@ void menus_play_focus_lost() {
 #define building_is_allowed (menus_play_box_dimension_limit > 0 && menus_play_box_volume_limit > 0 && (packet_is_sendable(PACKET_MAP_MODIFY) || packet_is_sendable(PACKET_MAP_FILL)))
 #define cuboid_is_allowed (menus_play_box_enable && menus_play_box_dimension_limit > 1 && menus_play_box_volume_limit > 1 && packet_is_sendable(PACKET_MAP_MODIFY))
 
-void menus_play() {
+void menus_play(void) {
 
   const int do_in_advance = 1;
 

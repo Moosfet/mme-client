@@ -6,7 +6,7 @@ char *menus_server_loading_message = NULL;
 
 //--page-split-- menus_server_loading
 
-void menus_server_loading() {
+void menus_server_loading(void) {
 
   if (menus_server_loading_message == NULL) {
     if (gui_window(26, 6, 3)) menu_switch(menus_server_disconnect);

@@ -4,6 +4,8 @@
 #include <string.h>
 #include <errno.h>
 
+//--page-split-- main
+
 void main (int argc, char **argv) {
   if (argc < 2) {
     fprintf(stderr, "Specify input files on command line.\n");

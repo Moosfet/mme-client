@@ -2,7 +2,7 @@
 
 //--page-split-- opengl_extentions
 
-void opengl_extentions() {
+void opengl_extentions(void) {
 
   #ifdef TEST
 

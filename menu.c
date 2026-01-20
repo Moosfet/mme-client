@@ -27,7 +27,7 @@ int menu_display_data = 0;
 
 //--page-split-- menu_switch
 
-void menu_switch(void (*menu)()) {
+void menu_switch(void (*menu)(void)) {
   if (menu_function_pointer == menu) return;
 //  #ifdef TEST
 //  if (menu_function_pointer == menus_server_loading) on_activate_lag = 1;
@@ -45,7 +45,7 @@ void menu_switch(void (*menu)()) {
 
 //--page-split-- menu_process
 
-void menu_process() {
+void menu_process(void) {
   menu_process_event = 1;
   menu_draw_widget = 0;
   for (menu_current_event = 0; menu_current_event < event_list_index; menu_current_event++) {
@@ -113,7 +113,7 @@ void menu_process() {
 
 //--page-split-- f3_display
 
-static void f3_display() {
+static void f3_display(void) {
   #define LINES 20
   char line[LINES][64] = {};
 
@@ -152,7 +152,7 @@ static void f3_display() {
 
 //--page-split-- fps_display
 
-static void fps_display() {
+static void fps_display(void) {
   char buffer[64];
   int length;
   snprintf(buffer, 64, "%0.0f FPS", statistics_current_fps); buffer[63] = 0;
@@ -185,7 +185,7 @@ static void fps_display() {
 
 //--page-split-- cheap_hud_display
 
-static void cheap_hud_display() {
+static void cheap_hud_display(void) {
   int row = 0;
   if (option_fps_display) row = 4;
   if (player_fly) gui_text(gui_text_columns - 6, row++, "FLYING");
@@ -196,7 +196,7 @@ static void cheap_hud_display() {
 
 //--page-split-- menu_render
 
-void menu_render() {
+void menu_render(void) {
 //  if (!glfwGetWindowParam(GLFW_OPENED)) return;
 
   GLuint viewport[4];

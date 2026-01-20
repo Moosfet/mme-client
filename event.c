@@ -15,7 +15,7 @@ double event_mouse_position_y;
 
 //--page-split-- screenshot
 
-static void screenshot() {
+static void screenshot(void) {
   #ifdef UNIX
   mkdir("screenshots", 0777);
   #else
@@ -57,13 +57,13 @@ static void screenshot() {
 
 //--page-split-- event_open_window
 
-void event_open_window() {
+void event_open_window(void) {
   glfwGetCursorPos(glfw_window, &event_mouse_position_x, &event_mouse_position_y);
 };
 
 //--page-split-- event_receive
 
-void event_receive() {
+void event_receive(void) {
   DEBUG("enter event_receive()");
 
   // This "for" loop repeatedly calls glfwPollEvents(), and if it causes some

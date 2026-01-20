@@ -183,7 +183,7 @@ static void *directsound_output_thread(void *argument) {
 
 #ifdef WINDOWS
 
-void directsound_initialize() {
+void directsound_initialize(void) {
 
   printf("DirectSound buffer size is %d\n", buffer_size);
   period_size = buffer_size / 4;
@@ -257,7 +257,7 @@ void directsound_initialize() {
 
 #ifdef WINDOWS
 
-void directsound_terminate() {
+void directsound_terminate(void) {
 
   easy_thread_set_exit_flag(&thread_state);
   easy_thread_join(&thread_state);

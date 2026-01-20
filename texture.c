@@ -152,7 +152,7 @@ void texture_list(int texture, char *file, int size, int flags) {
 
 //--page-split-- texture_initialize
 
-void texture_initialize() {
+void texture_initialize(void) {
   extern char data_no_zero_png; extern int size_no_zero_png;
   texture_data[TEXTURE_NO_ZERO].memory = &data_no_zero_png;
   texture_data[TEXTURE_NO_ZERO].size = size_no_zero_png;
@@ -213,7 +213,7 @@ void texture_initialize() {
 
 //--page-split-- texture_open_window
 
-void texture_open_window() {
+void texture_open_window(void) {
   texture_list_base = glGenLists(TEXTURE_MAX_TEXTURES);
   extern char data_full_screen_png; extern int size_full_screen_png;
   texture_full_screen = texture_load(&data_full_screen_png, size_full_screen_png, TEXTURE_FLAG_PIXELATE);
@@ -236,7 +236,7 @@ void texture_open_window() {
 
 //--page-split-- texture_close_window
 
-void texture_close_window() {
+void texture_close_window(void) {
   for (int i = 0; i < TEXTURE_MAX_TEXTURES; i++) {
     memory_allocate(&texture_data[i].digest, 0);
     if (texture_data[i].name != 0) {
@@ -249,7 +249,7 @@ void texture_close_window() {
 
 //--page-split-- texture_rebind
 
-void texture_rebind () {
+void texture_rebind (void) {
   for (int i = 0; i < TEXTURE_MAX_TEXTURES; i++) {
     glNewList(texture_list_base + i, GL_COMPILE);
     glBindTexture(GL_TEXTURE_2D, texture_data[i].name + RENDER_IN_GRAYSCALE);
@@ -259,7 +259,7 @@ void texture_rebind () {
 
 //--page-split-- texture_reset
 
-void texture_reset() {
+void texture_reset(void) {
   for (int i = 0; i < TEXTURE_MAX_SERVER_TEXTURES; i++) {
     memory_allocate(&texture_data[i].digest, 0);
     memory_allocate(&texture_data[i].file, 0);

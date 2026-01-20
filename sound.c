@@ -4,7 +4,7 @@ struct structure_sound_data sound_list[SOUND_MAX_SOUNDS];
 
 //--page-split-- sound_reset
 
-void sound_reset () {
+void sound_reset (void) {
   int a;
   for (a = 0; a < SOUND_MAX_SERVER_SOUNDS; a++) {
 
@@ -22,7 +22,7 @@ void sound_reset () {
 
 //--page-split-- sound_initialize
 
-void sound_initialize() {
+void sound_initialize(void) {
   mixer_initialize(); // must be before alsa_initialize()
   #ifdef LINUX
   alsa_initialize();
@@ -68,7 +68,7 @@ void sound_initialize() {
 
 //--page-split-- sound_terminate
 
-void sound_terminate() {
+void sound_terminate(void) {
   #ifdef LINUX
   alsa_terminate();
   #else

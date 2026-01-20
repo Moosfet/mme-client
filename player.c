@@ -32,7 +32,7 @@ static int falling = 0;
 
 //--page-split-- player_reset
 
-void player_reset() {
+void player_reset(void) {
   player_position.x = map_data.dimension.x / 2.0;
   player_position.y = map_data.dimension.y / 2.0;
   player_position.z = map_data.dimension.z - 0.001;
@@ -201,7 +201,7 @@ static double stairs_test(double px, double py, double pz) {
 
 //--page-split-- slide
 
-static void slide() {
+static void slide(void) {
 
   struct double_xyzuv old = player_position;
   struct double_xyzuv new = player_position;
@@ -359,7 +359,7 @@ int player_get_vector(struct int_xyz *v) {
 
 //--page-split-- player_movement
 
-void player_movement() {
+void player_movement(void) {
   DEBUG("enter player_movement()");
   static double last_movment_stamp = 0;
   static int start_time = 0;

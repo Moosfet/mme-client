@@ -13,7 +13,7 @@ static GLuint list;
 
 //--page-split-- stars_open_window
 
-void stars_open_window() {
+void stars_open_window(void) {
 
   list = glGenLists(1);
 
@@ -65,7 +65,7 @@ void stars_open_window() {
 
 //--page-split-- stars_close_window
 
-void stars_close_window() {
+void stars_close_window(void) {
   glDeleteLists(list, 1);
 };
 
@@ -73,7 +73,7 @@ void stars_close_window() {
 
 #define sidereal_seconds 86164.091
 
-void stars_render() {
+void stars_render(void) {
   glPushMatrix();
   glTranslated(player_view.x, player_view.y, player_view.z);
   glRotated(-90, +1, 0, 0); // Our up is the planet's side!

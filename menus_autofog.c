@@ -2,7 +2,7 @@
 
 //--page-split-- menus_autofog
 
-void menus_autofog() {
+void menus_autofog(void) {
 
   if (menu_process_event && KEY_PRESS_EVENT && KEY == GLFW_KEY_ESCAPE) menu_switch(menus_escape);
   if (gui_window(58, 14, 3)) menu_switch(menus_play);

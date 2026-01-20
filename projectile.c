@@ -19,14 +19,14 @@ static int projectile_count = 0;
 
 //--page-split-- projectile_reset
 
-void projectile_reset() {
+void projectile_reset(void) {
   projectile_count = 0;
   memory_allocate(&projectile, projectile_count);
 }
 
 //--page-split-- projectile_render
 
-void projectile_render() {
+void projectile_render(void) {
 
   glBegin(GL_QUADS);
 
@@ -331,7 +331,7 @@ static int projectile_collision_proc (struct projectile *d) {
 
 //--page-split-- projectile_allocate
 
-static struct projectile *projectile_allocate() {
+static struct projectile *projectile_allocate(void) {
   if (projectile == NULL) {
     memory_allocate(&projectile, sizeof (struct projectile));
     projectile[0].active = 0;
@@ -474,7 +474,7 @@ void projectile_create(int who, int type, struct double_xyzuv start_position) {
 
 //--page-split-- projectile_movement
 
-void projectile_movement() {
+void projectile_movement(void) {
 
   // Figure out how many 1/1000th of a second has passed
   // between each frame, but do so in a way that rounding

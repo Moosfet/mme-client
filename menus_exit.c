@@ -5,14 +5,14 @@ static int cache = 0, nag = 0;
 
 //--page-split-- menus_exit_immediately
 
-void menus_exit_immediately() {
+void menus_exit_immediately(void) {
   nag = 0; cache = 1;
   termination_time = on_frame_time - 1.0;
 };
 
 //--page-split-- menus_exit
 
-void menus_exit() {
+void menus_exit(void) {
 
   glfw_fullscreen(0);
 

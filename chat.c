@@ -10,7 +10,7 @@ int chat_array_count = 0;
 
 //--page-split-- chat_reset
 
-void chat_reset() {
+void chat_reset(void) {
   for (int i = 0; i < chat_array_count; i++) {
     memory_allocate(&array[i].string, 0);
     memory_allocate(&array[i].colors, 0);

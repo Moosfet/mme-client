@@ -35,7 +35,7 @@ static double last_position_time = 0;
 
 //--page-split-- communicate_with_server
 
-void communicate_with_server() {
+void communicate_with_server(void) {
 
   // Read from the network socket into our buffer...
 
@@ -158,7 +158,7 @@ void communicate_with_server() {
 
 //--page-split-- server_terminate
 
-void server_terminate() {
+void server_terminate(void) {
   memory_allocate(&server_address, 0);
   memory_allocate(&server_authentication, 0);
   memory_allocate(&server_portal_authentication, 0);
@@ -168,7 +168,7 @@ void server_terminate() {
 
 //--page-split-- server_stuff
 
-void server_stuff() {
+void server_stuff(void) {
   DEBUG("enter server_stuff()");
 
   if (server_status == SERVER_STATUS_DISCONNECTED) {
@@ -293,7 +293,7 @@ void server_stuff() {
 
 //--page-split-- server_menu_request
 
-void server_menu_request() {
+void server_menu_request(void) {
   packet_send(PACKET_MENU_REQUEST, gui_text_columns, gui_text_lines);
   last_width_report = gui_text_columns;
   last_height_report = gui_text_lines;

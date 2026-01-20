@@ -4,7 +4,7 @@ static int current_group = -1;
 
 //--page-split-- menus_group
 
-void menus_group() {
+void menus_group(void) {
   DEBUG("enter menus_group()");
 
   int the_width = gui_text_columns - 2;

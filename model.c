@@ -8,7 +8,7 @@ static struct double_xyzuv smoothicate[256] = {};
 
 //--page-split-- model_open_window
 
-void model_open_window() {
+void model_open_window(void) {
 //  extern char data_player_png; extern int size_player_png;
 //  default_texture = texture_load(&data_player_png, size_player_png, TEXTURE_FLAG_PIXELATE);
   extern char data_boy_png; extern int size_boy_png;
@@ -19,13 +19,13 @@ void model_open_window() {
 
 //--page-split-- model_close_window
 
-void model_close_window() {
+void model_close_window(void) {
   glDeleteTextures(1, &default_texture);
 };
 
 //--page-split-- model_reset
 
-void model_reset() {
+void model_reset(void) {
   for (int i = 0; i < 256; i++) {
     model_player[i].valid = 0;
     model_player[i].position = (struct double_xyzuv) {};
@@ -52,7 +52,7 @@ void model_move(int player, struct double_xyzuv position) {
 
 //--page-split-- model_render
 
-void model_render() {
+void model_render(void) {
 
   struct double_xyzuv pp = player_view;
 

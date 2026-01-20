@@ -17,7 +17,7 @@ static char *dynamic_error_message;
 
 //--page-split-- packet_reset
 
-void packet_reset() {
+void packet_reset(void) {
   communication_error_flag = 0;
   // Clear packet selection bit vectors...
   memset(available_packet_types, 0, 8192);

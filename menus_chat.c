@@ -5,13 +5,13 @@ static int last_chat_count = -1;
 
 //--page-split-- menus_chat_scroll_reset
 
-void menus_chat_scroll_reset() {
+void menus_chat_scroll_reset(void) {
     scroll_index = 0;
 }
 
 //--page-split-- menus_chat
 
-void menus_chat() {
+void menus_chat(void) {
 
   static int map;
 

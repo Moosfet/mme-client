@@ -65,7 +65,7 @@ static void salt_password(int i, int f) {
 
 //--page-split-- send_form_data
 
-static void send_form_data() {
+static void send_form_data(void) {
   easy_random_binary_string(salt, 20);
   for (int i = 0; i < MENU_MAX_OBJECTS - 1; i++) {
     if (type == MENU_CHECK) {
@@ -85,7 +85,7 @@ static void send_form_data() {
 
 //--page-split-- menus_server_menu_reset
 
-void menus_server_menu_reset() {
+void menus_server_menu_reset(void) {
   menus_server_menu_active = 0;
   for (int i = 0; i < MENU_MAX_OBJECTS - 1; i++) {
     type = MENU_NONE;
@@ -98,7 +98,7 @@ void menus_server_menu_reset() {
 
 //--page-split-- menus_server_menu
 
-void menus_server_menu() {
+void menus_server_menu(void) {
 
   lag_push(1, "menus_server_menu()");
 

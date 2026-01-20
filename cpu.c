@@ -5,7 +5,7 @@ int cpu_core_count = 2;
 
 //--page-split-- cpu_initialize
 
-void cpu_initialize() {
+void cpu_initialize(void) {
   #ifdef WINDOWS
     SYSTEM_INFO sysinfo;
     GetSystemInfo(&sysinfo);
@@ -25,7 +25,7 @@ void cpu_initialize() {
 
 //--page-split-- cpu_analyze
 
-void cpu_analyze() {
+void cpu_analyze(void) {
   DEBUG("enter cpu_analyze()");
 
   double min_next_frame_time = on_frame_time;

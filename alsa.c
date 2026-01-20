@@ -117,7 +117,7 @@ static void *pcm_output_thread(void *argument) {
 
 #ifdef LINUX
 
-void alsa_initialize() {
+void alsa_initialize(void) {
 
   alsa_error_function = NULL;
 
@@ -215,7 +215,7 @@ void alsa_initialize() {
 
 #ifdef LINUX
 
-void alsa_terminate() {
+void alsa_terminate(void) {
 
   int error;
 
