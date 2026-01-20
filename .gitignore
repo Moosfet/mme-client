@@ -10,3 +10,5 @@ mme
 mme.exe
 build.c
 temp
+static/libglfw3.a
+static/libz.a

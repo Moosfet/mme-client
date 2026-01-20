@@ -1,7 +1,6 @@
 #include "everything.h"
 
 #ifdef WINDOWS
-  #define WINVER WindowsXP
   #include <w32api.h>
   #include <winsock2.h>
   //#include <windows.h>

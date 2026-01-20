@@ -338,7 +338,7 @@ void event_keyboard_key_callback(GLFWwindow *window, int key, int scancode, int 
           int major = osvi.dwMajorVersion;
           int minor = osvi.dwMinorVersion;
           snprintf(os_version, 64, "Windows %d.%d", major, minor);
-          os_version[4095] = 0;
+          os_version[63] = 0;
         #else
           strcpy(os_version, build_target);
         #endif

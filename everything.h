@@ -19,8 +19,8 @@
 #define _GNU_SOURCE
 
 #ifdef WINDOWS
+  #define WINVER 0x0501
   #include <w32api.h>
-  #define WINVER WindowsXP
   #include <winsock2.h>
   #include <windows.h>
   #include <ws2tcpip.h>

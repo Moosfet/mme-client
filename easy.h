@@ -8,7 +8,9 @@
 #define EASY_H
 
 #ifdef WINDOWS
-#define WINVER WindowsXP
+#ifndef WINVER
+#define WINVER 0x0501
+#endif
 #include <windows.h>
 void *memmem(const void *, size_t, const void *, size_t);
 char *index(const char *, int);
