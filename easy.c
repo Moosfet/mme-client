@@ -1180,7 +1180,7 @@ void easy_thread_join(struct easy_thread_state *thread_state) {
 #ifndef EASY_NO_THREADS
 void easy__sem_init(char *file, int line, sem_t *sem, int pshared, unsigned int value) {
   int rv = sem_init(sem, pshared, value);
-  if (rv) easy__fuck(file, line, 1, "sem_init() returned %s", easy_error_string(errno));
+  if (rv) easy__fuck(file, line, 1, "sem_init() returned %s", easy_error_string(rv));
 };
 #endif
 
@@ -1189,7 +1189,7 @@ void easy__sem_init(char *file, int line, sem_t *sem, int pshared, unsigned int 
 #ifndef EASY_NO_THREADS
 void easy__sem_post(char *file, int line, sem_t *sem) {
   int rv = sem_post(sem);
-  if (rv) easy__fuck(file, line, 1, "sem_post() returned %s", easy_error_string(errno));
+  if (rv) easy__fuck(file, line, 1, "sem_post() returned %s", easy_error_string(rv));
 };
 #endif
 
@@ -1198,7 +1198,7 @@ void easy__sem_post(char *file, int line, sem_t *sem) {
 #ifndef EASY_NO_THREADS
 void easy__sem_wait(char *file, int line, sem_t *sem) {
   int rv = sem_wait(sem);
-  if (rv) easy__fuck(file, line, 1, "sem_wait() returned %s", easy_error_string(errno));
+  if (rv) easy__fuck(file, line, 1, "sem_wait() returned %s", easy_error_string(rv));
 };
 #endif
 
@@ -1207,7 +1207,7 @@ void easy__sem_wait(char *file, int line, sem_t *sem) {
 #ifndef EASY_NO_THREADS
 int easy__sem_trywait(char *file, int line, sem_t *sem) {
   int rv = sem_trywait(sem);
-  if (rv && errno != EAGAIN) easy__fuck(file, line, 1, "sem_trywait() returned %s", easy_error_string(errno));
+  if (rv && errno != EAGAIN) easy__fuck(file, line, 1, "sem_trywait() returned %s", easy_error_string(rv));
   return rv;
 };
 #endif
@@ -1217,7 +1217,7 @@ int easy__sem_trywait(char *file, int line, sem_t *sem) {
 #ifndef EASY_NO_THREADS
 void easy__sem_destroy(char *file, int line, sem_t *sem){
   int rv = sem_destroy(sem);
-  if (rv) easy__fuck(file, line, 1, "sem_destroy() returned %s", easy_error_string(errno));
+  if (rv) easy__fuck(file, line, 1, "sem_destroy() returned %s", easy_error_string(rv));
 };
 #endif
 
@@ -1226,7 +1226,7 @@ void easy__sem_destroy(char *file, int line, sem_t *sem){
 #ifndef EASY_NO_THREADS
 void easy__mutex_init(char *file, int line, pthread_mutex_t *mutex, const pthread_mutexattr_t *attr) {
   int rv = pthread_mutex_init(mutex, attr);
-  if (rv) easy__fuck(file, line, 1, "pthread_mutex_init() returned %s", easy_error_string(errno));
+  if (rv) easy__fuck(file, line, 1, "pthread_mutex_init() returned %s", easy_error_string(rv));
 };
 #endif
 
@@ -1235,7 +1235,7 @@ void easy__mutex_init(char *file, int line, pthread_mutex_t *mutex, const pthrea
 #ifndef EASY_NO_THREADS
 void easy__mutex_lock(char *file, int line, pthread_mutex_t *mutex) {
   int rv = pthread_mutex_lock(mutex);
-  if (rv) easy__fuck(file, line, 1, "pthread_mutex_lock() returned %s", easy_error_string(errno));
+  if (rv) easy__fuck(file, line, 1, "pthread_mutex_lock() returned %s", easy_error_string(rv));
 };
 #endif
 
@@ -1244,7 +1244,7 @@ void easy__mutex_lock(char *file, int line, pthread_mutex_t *mutex) {
 #ifndef EASY_NO_THREADS
 int easy__mutex_trylock(char *file, int line, pthread_mutex_t *mutex) {
   int rv = pthread_mutex_trylock(mutex);
-  if (rv && errno != EAGAIN) easy__fuck(file, line, 1, "pthread_mutex_init() returned %s", easy_error_string(errno));
+  if (rv && errno != EAGAIN) easy__fuck(file, line, 1, "pthread_mutex_init() returned %s", easy_error_string(rv));
 };
 #endif
 
@@ -1253,7 +1253,7 @@ int easy__mutex_trylock(char *file, int line, pthread_mutex_t *mutex) {
 #ifndef EASY_NO_THREADS
 void easy__mutex_unlock(char *file, int line, pthread_mutex_t *mutex) {
   int rv = pthread_mutex_unlock(mutex);
-  if (rv) easy__fuck(file, line, 1, "pthread_mutex_unlock() returned %s", easy_error_string(errno));
+  if (rv) easy__fuck(file, line, 1, "pthread_mutex_unlock() returned %s", easy_error_string(rv));
 };
 #endif
 
@@ -1262,7 +1262,7 @@ void easy__mutex_unlock(char *file, int line, pthread_mutex_t *mutex) {
 #ifndef EASY_NO_THREADS
 void easy__mutex_destroy(char *file, int line, pthread_mutex_t *mutex) {
   int rv = pthread_mutex_destroy(mutex);
-  if (rv) easy__fuck(file, line, 1, "pthread_mutex_destroy() returned %s", easy_error_string(errno));
+  if (rv) easy__fuck(file, line, 1, "pthread_mutex_destroy() returned %s", easy_error_string(rv));
 };
 #endif
 
@@ -2527,7 +2527,7 @@ static void md5_process(void *_digest, void *_message) {
 
 //--page-split-- easy_md5
 
-void easy_md5(void *_digest, void *_message, unsigned int length) {
+void easy_md5(char *_digest, const char *_message, int length) {
 
   // Buffer to store last two blocks, since they require
   // modification to add the padding and message length.

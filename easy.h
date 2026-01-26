@@ -263,6 +263,7 @@ void easy_buffer__free(struct easy_buffer *, int, char *, int);
 const char *easy_error_string(int error_code);
 
 void easy_sha1(char *digest, const char *message, int length);
+void easy_md5(char *digest, const char *message, int length);
 
 /*
   allow_errors =  1 means allow all errors
